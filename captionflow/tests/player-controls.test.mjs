@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_CAPTION_STYLE, CONTRAST_CLASSES, HIDE_CONTROLS_AFTER_MS,
   normalizeCaptionStyle, captionStyleToCss, shouldHideControls, shortcutFor, cueLabel,
+  SPEED_PRESETS, MIN_SPEED, MAX_SPEED, clampSpeed, stepSpeed, speedLabel, paceSummary,
 } from '../src/player-controls.mjs';
 
 test('captionStyleToCss maps every style key to its CSS variable, with defaults', () => {
@@ -109,4 +110,39 @@ test('cueLabel gives a position, never an internal id', () => {
   assert.equal(cueLabel(cues, null), '');
   assert.equal(cueLabel(cues, { id: 'missing' }), '');
   assert.doesNotMatch(cueLabel(cues, cues[0]), /seg-/);
+});
+
+test('clampSpeed rounds to 0.05 steps, clamps to 0.25-2, and falls back to normal', () => {
+  assert.equal(clampSpeed(0.87), 0.85);
+  assert.equal(clampSpeed(0.88), 0.9);
+  assert.equal(clampSpeed('1.5'), 1.5);
+  assert.equal(clampSpeed(0.1), MIN_SPEED);
+  assert.equal(clampSpeed(3), MAX_SPEED);
+  assert.equal(clampSpeed(NaN), 1);
+  assert.equal(clampSpeed(undefined), 1);
+  for (const preset of SPEED_PRESETS) assert.equal(clampSpeed(preset), preset);
+});
+
+test('stepSpeed moves one step and stops at the bounds', () => {
+  assert.equal(stepSpeed(1, 1), 1.05);
+  assert.equal(stepSpeed(1, -1), 0.95);
+  assert.equal(stepSpeed(0.25, -1), 0.25);
+  assert.equal(stepSpeed(2, 1), 2);
+  assert.equal(stepSpeed(0.85, 1), 0.9);
+});
+
+test('speedLabel and paceSummary describe the pace for sighted and screen reader users', () => {
+  assert.equal(speedLabel(1), 'Normal');
+  assert.equal(speedLabel(0.75), '0.75×');
+  assert.deepEqual(paceSummary({}), { text: 'Pace: Normal', ariaLabel: 'Reading pace: normal speed' });
+  assert.deepEqual(paceSummary({ speed: 0.75, pauseEachCaption: true }), {
+    text: 'Pace: 0.75× · Pause',
+    ariaLabel: 'Reading pace: 0.75 times speed, pausing at each caption',
+  });
+});
+
+test('shortcutFor maps Shift+> and Shift+< to speed, but not in form fields', () => {
+  assert.equal(shortcutFor({ key: '>', shiftKey: true, target: { tagName: 'VIDEO' } }), 'speedUp');
+  assert.equal(shortcutFor({ key: '<', shiftKey: true, target: { tagName: 'BUTTON' } }), 'speedDown');
+  assert.equal(shortcutFor({ key: '>', shiftKey: true, target: { tagName: 'INPUT', type: 'search' } }), null);
 });
