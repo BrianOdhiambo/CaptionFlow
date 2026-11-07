@@ -1,8 +1,12 @@
 import { selectActiveCue, nextCue, replayCue } from '/player-sync.mjs';
 import { viewCaptionsForMode } from '/caption-view.mjs';
+import { HIDE_CONTROLS_AFTER_MS, shouldHideControls, shortcutFor, cueLabel } from '/player-controls.mjs';
+import { connectCaptionSettingsPort } from '/caption-settings-port.mjs';
 
 const byId = id => document.getElementById(id);
-const ids = ['video','video-file','caption-file','caption','caption-wrap','language','mode','pace','size','undo','contrast','replay','next','transcript','message','time-status','provider','generate','provider-note','hosted-consent-wrap','hosted-consent','download-json','download-transcript','demo-warning','caption-status','follow','show-times','transcript-size','transcript-search','search-prev','search-next','search-status'];
+const ids = ['video','video-file','caption-file','caption','caption-wrap','language','mode','replay','next','transcript','message','time-status','provider','generate','provider-note','hosted-consent-wrap','hosted-consent','download-json','download-transcript','demo-warning','caption-status',
+  'video-shell','player-bar','player-hint','play','time','seek','pace-button','pace-text','pace-menu','cc','mute','fullscreen','caption-settings-root',
+  'follow','show-times','transcript-size','transcript-search','search-prev','search-next','search-status'];
 const els = Object.fromEntries(ids.map(id => [id, byId(id)]));
 let cues = [];
 let payload = null;
@@ -14,6 +18,7 @@ let videoSelectionVersion = 0;
 let isGenerating = false;
 let objectUrl = null;
 let providerAvailability = { fixture: true, local: true, hosted: false };
+let pace = 'normal';  // normal | 0.5 | 0.75 | 1.25 | 1.5 | 1.75 | 2 | manual
 let matchIds = [];
 let matchIndex = -1;
 const timeLabel = t => `${Math.floor(t/60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
@@ -181,13 +186,17 @@ function sync() {
     }
     if (currentCueId && els.follow.checked) followActiveLine();
   }
-  els['time-status'].textContent = `Playback position: ${timeLabel(els.video.currentTime || 0)}${cue ? ` · Caption ${cue.id}` : ''}`;
-  if (cue && els.pace.value === 'manual' && !els.video.paused &&
+  const label = cueLabel(cues, cue);
+  els['time-status'].textContent = `Playback position: ${timeLabel(els.video.currentTime || 0)}${label ? ` · ${label}` : ''}`;
+  updateTime();
+  if (cue && pace === 'manual' && !els.video.paused &&
       cue.id !== lastManualPausedId && cue.id !== skipManualPauseForCueId &&
       els.video.currentTime >= cue.start + 0.06) {
     lastManualPausedId = cue.id;
     els.video.pause();
-    message('Paused at a new caption. Read it, then press Play to continue.');
+    els['player-hint'].hidden = false;
+    noteActivity();
+    message('Paused so you can read. Press Play or Next.');
   }
 }
 function setCaptions(data, nextSource) {
@@ -234,12 +243,11 @@ async function loadDemoCues() {
   setCaptions(data, 'fixture');
   message(`${cues.length} fictional sample captions loaded; they are NOT related to an arbitrary selected video.`);
 }
-function applyScale(value) {
-  els['caption-wrap'].style.setProperty('--caption-scale', String(value));
-  els.size.value = String(value);
+function paceRate(value) {
+  return value === 'normal' || value === 'manual' ? 1 : Number(value);
 }
 function applyPace() {
-  els.video.playbackRate = els.pace.value === 'manual' ? 1 : Number(els.pace.value);
+  els.video.playbackRate = paceRate(pace);
   lastManualPausedId = null;
   sync();
 }
@@ -270,6 +278,7 @@ els['video-file'].addEventListener('change', () => {
     message('No video or captions selected. Choose a video to continue.');
     return;
   }
+  els['player-hint'].hidden = true;
   objectUrl = URL.createObjectURL(file);
   els.video.src = objectUrl;
   els.video.load();
@@ -343,7 +352,6 @@ for (const name of ['language', 'mode']) els[name].addEventListener('change', ()
   if (source === 'fixture') loadDemoCues().catch(error => message(error.message));
   else message('Using selected caption JSON. Change the JSON or re-transcribe to change caption language or wording.');
 });
-els.pace.addEventListener('change', applyPace);
 els['transcript-size'].addEventListener('change', () => { els.transcript.dataset.size = els['transcript-size'].value; });
 els['show-times'].addEventListener('change', () => els.transcript.classList.toggle('hide-times', !els['show-times'].checked));
 els['transcript-search'].addEventListener('input', applySearch);
@@ -364,26 +372,7 @@ els['download-transcript'].addEventListener('click', () => {
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
-els.size.addEventListener('change', async () => {
-  try {
-    const response = await fetch('/api/font-scale', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: Number(els.size.value) }) });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-    applyScale(data.fontScale);
-    message('Caption size saved to the local toolkit profile.');
-  } catch (error) { message(`Could not save caption size: ${error.message}`); }
-});
-els.undo.addEventListener('click', async () => {
-  try {
-    const response = await fetch('/api/undo-font-scale', { method: 'POST' });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-    applyScale(data.preferences.fontScale);
-    message(data.undone ? 'Previous caption size restored.' : 'There is no earlier caption-size change to undo.');
-  } catch (error) { message(`Undo failed: ${error.message}`); }
-});
-els.contrast.addEventListener('change', () => els['caption-wrap'].classList.toggle('low', !els.contrast.checked));
-els.replay.addEventListener('click', () => {
+function replay() {
   const cue = replayCue(cues, els.video.currentTime);
   if (!cue) { message('There is no previous caption to replay at this position.'); return; }
   // Do not immediately auto-pause again at the start of a manually replayed cue.
@@ -391,18 +380,20 @@ els.replay.addEventListener('click', () => {
   els.video.currentTime = cue.start;
   sync();
   els.video.play().then(
-    () => message(`Replaying caption ${cue.id}.`),
+    () => message(`Replaying ${cueLabel(cues, cue).toLowerCase()}.`),
     error => message(`Unable to resume playback: ${error.message}`),
   );
-});
-els.next.addEventListener('click', () => {
+}
+function next() {
   const cue = nextCue(cues, els.video.currentTime);
   if (cue) {
     els.video.currentTime = cue.start;
     sync();
-    message(`Moved to caption ${cue.id}. Press Play to continue.`);
+    message(`Moved to ${cueLabel(cues, cue).toLowerCase()}. Press Play to continue.`);
   } else message('You are already at the last available caption.');
-});
+}
+els.replay.addEventListener('click', replay);
+els.next.addEventListener('click', next);
 els['download-json'].addEventListener('click', () => {
   if (!payload) return;
   const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
@@ -413,11 +404,244 @@ els['download-json'].addEventListener('click', () => {
   // Allow the click to consume its object URL; release after the next task.
   queueMicrotask(() => URL.revokeObjectURL(url));
 });
+// In-player control bar. Everything lives inside #video-shell so full screen keeps it all.
+const shell = els['video-shell'];
+const PACE_LABELS = { normal: 'Normal (1×)', '0.5': '0.5×', '0.75': '0.75×', '1.25': '1.25×', '1.5': '1.5×', '1.75': '1.75×', '2': '2×', manual: 'Pause at each caption' };
+const PACE_SHORT = { normal: 'Normal', '0.5': '0.5×', '0.75': '0.75×', '1.25': '1.25×', '1.5': '1.5×', '1.75': '1.75×', '2': '2×', manual: 'Pause' };
+const SEEK_STEP_SECONDS = 5;
+let lastActivity = Date.now();
+let hideTimer = null;
+let wasPlayingBeforePanel = false;
+let tapRevealedControls = false;
+
+function keyboardFocusInBar() {
+  const active = document.activeElement;
+  if (!active || !els['player-bar'].contains(active)) return false;
+  try { return active.matches(':focus-visible'); } catch { return true; }
+}
+function checkControls() {
+  clearTimeout(hideTimer);
+  const state = {
+    paused: els.video.paused,
+    menuOpen: !els['pace-menu'].hidden,
+    panelOpen: captionSettings.isOpen(),
+    focusInside: keyboardFocusInBar(),
+    msSinceActivity: Date.now() - lastActivity,
+  };
+  if (shouldHideControls(state)) { shell.classList.remove('controls-visible'); return; }
+  shell.classList.add('controls-visible');
+  // Only the idle time is left to wait for; anything else re-checks when it changes.
+  if (!state.paused && !state.menuOpen && !state.panelOpen && !state.focusInside) {
+    hideTimer = setTimeout(checkControls, HIDE_CONTROLS_AFTER_MS - state.msSinceActivity);
+  }
+}
+function noteActivity() {
+  lastActivity = Date.now();
+  checkControls();
+}
+
+function hasVideo() { return Boolean(els.video.currentSrc || els.video.getAttribute('src')); }
+function togglePlay() {
+  if (!hasVideo()) { message('Choose a video first.'); return; }
+  if (els.video.paused || els.video.ended) els.video.play().catch(error => message(`Unable to play: ${error.message}`));
+  else els.video.pause();
+}
+function updatePlayButton() {
+  const playing = !els.video.paused;
+  els.play.dataset.state = playing ? 'playing' : 'paused';
+  els.play.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  els.play.title = `${playing ? 'Pause' : 'Play'} (Space or K)`;
+}
+function duration() { return Number.isFinite(els.video.duration) ? els.video.duration : 0; }
+function updateTime() {
+  const total = duration();
+  const current = els.video.currentTime || 0;
+  els.time.textContent = `${timeLabel(current)} / ${timeLabel(total)}`;
+  els.seek.max = String(total);
+  els.seek.value = String(current);
+  els.seek.disabled = !total;
+  els.seek.setAttribute('aria-valuetext', `${timeLabel(current)} of ${timeLabel(total)}`);
+}
+function seekBy(seconds) {
+  if (!duration()) return;
+  els.video.currentTime = Math.min(duration(), Math.max(0, els.video.currentTime + seconds));
+}
+function toggleMute() {
+  els.video.muted = !els.video.muted;
+  updateMuteButton();
+}
+function updateMuteButton() {
+  const muted = els.video.muted;
+  els.mute.dataset.state = muted ? 'muted' : 'unmuted';
+  els.mute.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+  els.mute.title = `${muted ? 'Unmute' : 'Mute'} (M)`;
+}
+function toggleFullscreen() {
+  if (!document.fullscreenEnabled) return;
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else shell.requestFullscreen().catch(error => message(`Full screen is not available: ${error.message}`));
+}
+function updateFullscreenButton() {
+  const on = document.fullscreenElement === shell;
+  els.fullscreen.dataset.state = on ? 'on' : 'off';
+  els.fullscreen.setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen');
+  els.fullscreen.title = `${on ? 'Exit full screen' : 'Full screen'} (F)`;
+}
+
+const paceItems = [...els['pace-menu'].querySelectorAll('[data-pace]')];
+function setPace(value) {
+  pace = value;
+  for (const item of paceItems) item.setAttribute('aria-checked', String(item.dataset.pace === value));
+  els['pace-text'].textContent = `Pace: ${PACE_SHORT[value]}`;
+  els['pace-button'].setAttribute('aria-label', `Reading pace: ${PACE_LABELS[value]}`);
+  applyPace();
+}
+function openPaceMenu() {
+  els['pace-menu'].hidden = false;
+  els['pace-button'].setAttribute('aria-expanded', 'true');
+  (paceItems.find(item => item.getAttribute('aria-checked') === 'true') ?? paceItems[0]).focus();
+  noteActivity();
+}
+function closePaceMenu({ focusButton = false } = {}) {
+  if (els['pace-menu'].hidden) return;
+  els['pace-menu'].hidden = true;
+  els['pace-button'].setAttribute('aria-expanded', 'false');
+  if (focusButton) els['pace-button'].focus();
+  noteActivity();
+}
+els['pace-button'].addEventListener('click', () => {
+  if (els['pace-menu'].hidden) openPaceMenu(); else closePaceMenu();
+});
+for (const item of paceItems) item.addEventListener('click', () => {
+  setPace(item.dataset.pace);
+  closePaceMenu({ focusButton: true });
+  message(`Reading pace: ${PACE_LABELS[pace]}.`);
+});
+els['pace-menu'].addEventListener('keydown', event => {
+  event.stopPropagation();  // keep player shortcuts out of the menu
+  const index = paceItems.indexOf(document.activeElement);
+  const move = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: paceItems.length - 1 }[event.key];
+  if (move !== undefined) {
+    event.preventDefault();
+    paceItems[(move + paceItems.length) % paceItems.length].focus();
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    closePaceMenu({ focusButton: true });
+  } else if (event.key === 'Tab') closePaceMenu();
+});
+document.addEventListener('pointerdown', event => {
+  if (!els['pace-menu'].hidden && !els['pace-button'].parentElement.contains(event.target)) closePaceMenu();
+});
+
+// Shown in the settings mount until the caption settings panel registers.
+function createPlaceholderPanel() {
+  return {
+    open(container) {
+      const card = document.createElement('div');
+      card.className = 'caption-settings-placeholder';
+      card.setAttribute('role', 'dialog');
+      card.setAttribute('aria-label', 'Caption settings');
+      const text = document.createElement('p');
+      text.textContent = 'Caption settings are coming soon.';
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.textContent = 'Close';
+      close.addEventListener('click', () => captionSettings.cancelAndClose());
+      card.append(text, close);
+      container.append(card);
+    },
+    close() {},
+  };
+}
+function browserStorage() {
+  try { return window.localStorage; } catch { return null; }
+}
+const captionSettings = connectCaptionSettingsPort({
+  captionWrap: els['caption-wrap'],
+  mount: els['caption-settings-root'],
+  fetch: (...args) => fetch(...args),
+  storage: browserStorage(),
+  placeholder: createPlaceholderPanel(),
+  onClose() {
+    els.cc.setAttribute('aria-expanded', 'false');
+    els.cc.focus();
+    const resume = wasPlayingBeforePanel;
+    wasPlayingBeforePanel = false;
+    if (resume) els.video.play().catch(error => message(`Unable to resume playback: ${error.message}`));
+    noteActivity();
+  },
+  onSaved({ fontScaleSaved, error }) {
+    if (error) message(`Could not save caption settings: ${error.message}`);
+    else message(fontScaleSaved ? 'Caption settings saved. Text size is saved to the local toolkit profile.' : 'Caption settings saved in this browser.');
+  },
+});
+function openCaptionSettings() {
+  if (captionSettings.isOpen()) return;
+  closePaceMenu();
+  wasPlayingBeforePanel = !els.video.paused;
+  if (wasPlayingBeforePanel) els.video.pause();
+  captionSettings.openPanel();
+  els.cc.setAttribute('aria-expanded', 'true');
+  const mount = els['caption-settings-root'];
+  const first = mount.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  if (first) first.focus();
+  else { mount.tabIndex = -1; mount.focus(); }
+  checkControls();
+}
+
+const shortcutActions = {
+  togglePlay,
+  replay: () => { if (!els.replay.disabled) replay(); },
+  next: () => { if (!els.next.disabled) next(); },
+  openCaptions: openCaptionSettings,
+  closeCaptions: () => captionSettings.cancelAndClose(),
+  fullscreen: toggleFullscreen,
+  mute: toggleMute,
+  seekBack: () => seekBy(-SEEK_STEP_SECONDS),
+  seekForward: () => seekBy(SEEK_STEP_SECONDS),
+};
+shell.addEventListener('keydown', event => {
+  noteActivity();
+  if (!els['pace-menu'].hidden) return;
+  const action = shortcutFor(event, { panelOpen: captionSettings.isOpen() });
+  if (!action) return;
+  event.preventDefault();
+  shortcutActions[action]();
+});
+for (const type of ['pointermove', 'pointerdown', 'focusin']) shell.addEventListener(type, noteActivity);
+shell.addEventListener('focusout', () => setTimeout(checkControls, 0));
+// A tap on a touch screen while the bar is hidden only shows the bar.
+els.video.addEventListener('pointerdown', event => {
+  tapRevealedControls = event.pointerType !== 'mouse' && !shell.classList.contains('controls-visible');
+});
+els.video.addEventListener('click', () => {
+  if (tapRevealedControls) { tapRevealedControls = false; return; }
+  togglePlay();
+});
+els.play.addEventListener('click', togglePlay);
+els.cc.addEventListener('click', openCaptionSettings);
+els.mute.addEventListener('click', toggleMute);
+els.fullscreen.addEventListener('click', toggleFullscreen);
+els.fullscreen.hidden = !document.fullscreenEnabled;
+els.seek.addEventListener('input', () => { els.video.currentTime = Number(els.seek.value); });
+els.video.addEventListener('play', () => { els['player-hint'].hidden = true; updatePlayButton(); noteActivity(); });
+els.video.addEventListener('pause', () => { updatePlayButton(); checkControls(); });
+els.video.addEventListener('volumechange', updateMuteButton);
+document.addEventListener('fullscreenchange', () => { updateFullscreenButton(); noteActivity(); });
+// Captions sit above the bar: the caption box offset follows the bar's real height.
+if ('ResizeObserver' in window) {
+  new ResizeObserver(() => shell.style.setProperty('--bar-height', `${els['player-bar'].offsetHeight}px`)).observe(els['player-bar']);
+}
+updatePlayButton();
+updateMuteButton();
+updateTime();
+
 els.video.addEventListener('timeupdate', sync);
 els.video.addEventListener('seeking', sync);
 els.video.addEventListener('seeked', () => { lastManualPausedId = null; sync(); });
 els.video.addEventListener('ratechange', sync);
 els.video.addEventListener('loadedmetadata', sync);
+els.video.addEventListener('durationchange', updateTime);
 els.replay.disabled = true;
 els.next.disabled = true;
 window.addEventListener('beforeunload', () => { if (objectUrl) URL.revokeObjectURL(objectUrl); });
@@ -430,7 +654,7 @@ try {
   providerAvailability = providers.providers;
   for (const option of els.provider.options) option.disabled = !providerAvailability[option.value];
   els.provider.value = providerAvailability[providers.defaultProvider] ? providers.defaultProvider : 'fixture';
-  applyScale(prefs.fontScale);
+  captionSettings.loadSavedStyle({ fontScale: prefs.fontScale });
   updateProviderUI();
   if (els.provider.value === 'fixture') await loadDemoCues();
   else { els.mode.value = 'original'; message('Select a local video and generate timed captions.'); }
