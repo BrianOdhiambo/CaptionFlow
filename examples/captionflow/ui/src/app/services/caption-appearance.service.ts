@@ -16,7 +16,7 @@ export class CaptionAppearanceService {
   readonly appearance = this.state.asReadonly();
   readonly loadIssues: readonly CaptionAppearanceIssue[] = this.loaded.issues;
 
-  updateAppearance(patch: Partial<CaptionAppearance>): readonly CaptionAppearanceIssue[] {
+  updateAppearance(patch: unknown): readonly CaptionAppearanceIssue[] {
     const result = applyCaptionAppearancePatch(this.state(), patch);
     this.commit(result.appearance);
     return result.issues;

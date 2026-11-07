@@ -1,0 +1,129 @@
+<div class="d-grid gap-3">
+  <h2 class="h5 mb-0" id="caption-appearance-title">Caption appearance</h2>
+  <p class="small text-body-secondary mb-0">
+    Change how captions look on this device. Your choices are saved and apply to the video and to this preview.
+  </p>
+
+  <app-caption-preview [appearance]="appearance()" />
+  <app-caption-contrast-notice [appearance]="appearance()" />
+
+  <fieldset class="d-grid gap-2">
+    <legend class="form-label fw-semibold mb-1 fs-6">Presets</legend>
+    <div class="d-flex flex-wrap gap-2">
+      @for (preset of presets; track preset.id) {
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          [class.active]="selectedPresetId() === preset.id"
+          [attr.aria-pressed]="selectedPresetId() === preset.id"
+          (click)="choosePreset(preset.id)">
+          {{ preset.label }}
+        </button>
+      }
+    </div>
+  </fieldset>
+
+  <details class="border rounded p-3" open>
+    <summary class="fw-semibold">Typography</summary>
+    <div class="row g-3 mt-1">
+      <div class="col-12 col-sm-6">
+        <label class="form-label" for="caption-font-family">Font family</label>
+        <select id="caption-font-family" class="form-select" (change)="setText('fontFamily', $event)">
+          @for (option of fontFamilyOptions; track option.value) {
+            <option [value]="option.value" [selected]="appearance().fontFamily === option.value">{{ option.label }}</option>
+          }
+        </select>
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="form-label" for="caption-font-weight">Font weight</label>
+        <select id="caption-font-weight" class="form-select" (change)="setNumber('fontWeight', $event)">
+          @for (option of fontWeightOptions; track option.value) {
+            <option [value]="option.value" [selected]="appearance().fontWeight === option.value">{{ option.label }}</option>
+          }
+        </select>
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="form-label" for="caption-font-size">Text size: {{ appearance().fontSize }} rem</label>
+        <input id="caption-font-size" class="form-range" type="range" [min]="limits.fontSize.min" [max]="limits.fontSize.max" step="0.05" [value]="appearance().fontSize" (input)="setNumber('fontSize', $event)" />
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="form-label" for="caption-line-height">Line height: {{ appearance().lineHeight }}</label>
+        <input id="caption-line-height" class="form-range" type="range" [min]="limits.lineHeight.min" [max]="limits.lineHeight.max" step="0.05" [value]="appearance().lineHeight" (input)="setNumber('lineHeight', $event)" />
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="form-label" for="caption-letter-spacing">Letter spacing: {{ appearance().letterSpacing }} em</label>
+        <input id="caption-letter-spacing" class="form-range" type="range" [min]="limits.letterSpacing.min" [max]="limits.letterSpacing.max" step="0.01" [value]="appearance().letterSpacing" (input)="setNumber('letterSpacing', $event)" />
+      </div>
+    </div>
+  </details>
+
+  <details class="border rounded p-3">
+    <summary class="fw-semibold">Text</summary>
+    <div class="row g-3 mt-1">
+      <div class="col-12 col-sm-6">
+        <label class="form-label" for="caption-font-color">Text colour</label>
+        <input id="caption-font-color" class="form-control form-control-color" type="color" [value]="appearance().fontColor" (input)="setText('fontColor', $event)" />
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="form-label" for="caption-text-outline">Outline or shadow</label>
+        <select id="caption-text-outline" class="form-select" (change)="setText('textOutline', $event)">
+          @for (option of textOutlineOptions; track option.value) {
+            <option [value]="option.value" [selected]="appearance().textOutline === option.value">{{ option.label }}</option>
+          }
+        </select>
+      </div>
+    </div>
+  </details>
+
+  <details class="border rounded p-3">
+    <summary class="fw-semibold">Background</summary>
+    <div class="row g-3 mt-1">
+      <div class="col-12 col-sm-6">
+        <label class="form-label" for="caption-background-color">Background colour</label>
+        <input id="caption-background-color" class="form-control form-control-color" type="color" [value]="appearance().backgroundColor" (input)="setText('backgroundColor', $event)" />
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="form-label" for="caption-background-opacity">Background opacity: {{ appearance().backgroundOpacity }}</label>
+        <input id="caption-background-opacity" class="form-range" type="range" [min]="limits.backgroundOpacity.min" [max]="limits.backgroundOpacity.max" step="0.05" [value]="appearance().backgroundOpacity" (input)="setNumber('backgroundOpacity', $event)" />
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="form-label" for="caption-padding-horizontal">Horizontal padding: {{ appearance().backgroundPaddingHorizontal }} rem</label>
+        <input id="caption-padding-horizontal" class="form-range" type="range" [min]="limits.backgroundPaddingHorizontal.min" [max]="limits.backgroundPaddingHorizontal.max" step="0.05" [value]="appearance().backgroundPaddingHorizontal" (input)="setNumber('backgroundPaddingHorizontal', $event)" />
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="form-label" for="caption-padding-vertical">Vertical padding: {{ appearance().backgroundPaddingVertical }} rem</label>
+        <input id="caption-padding-vertical" class="form-range" type="range" [min]="limits.backgroundPaddingVertical.min" [max]="limits.backgroundPaddingVertical.max" step="0.05" [value]="appearance().backgroundPaddingVertical" (input)="setNumber('backgroundPaddingVertical', $event)" />
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="form-label" for="caption-radius">Corner radius: {{ appearance().backgroundRadius }} rem</label>
+        <input id="caption-radius" class="form-range" type="range" [min]="limits.backgroundRadius.min" [max]="limits.backgroundRadius.max" step="0.05" [value]="appearance().backgroundRadius" (input)="setNumber('backgroundRadius', $event)" />
+      </div>
+    </div>
+  </details>
+
+  <details class="border rounded p-3">
+    <summary class="fw-semibold">Position and contrast</summary>
+    <div class="row g-3 mt-1">
+      <div class="col-12 col-sm-6">
+        <label class="form-label" for="caption-position">Caption position</label>
+        <select id="caption-position" class="form-select" (change)="setText('captionPosition', $event)">
+          @for (option of positionOptions; track option.value) {
+            <option [value]="option.value" [selected]="appearance().captionPosition === option.value">{{ option.label }}</option>
+          }
+        </select>
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="form-label" for="caption-contrast-mode">Contrast mode</label>
+        <select id="caption-contrast-mode" class="form-select" (change)="setText('contrastMode', $event)">
+          @for (option of contrastModeOptions; track option.value) {
+            <option [value]="option.value" [selected]="appearance().contrastMode === option.value">{{ option.label }}</option>
+          }
+        </select>
+      </div>
+    </div>
+  </details>
+
+  <div class="d-flex justify-content-end">
+    <button type="button" class="btn btn-outline-secondary" (click)="resetToDefaults()">Reset to defaults</button>
+  </div>
+</div>

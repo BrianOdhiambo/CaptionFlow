@@ -1,0 +1,9 @@
+.caption-preview-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 16rem;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background-color: #1c1c22;
+}

@@ -1,6 +1,18 @@
-import { ChangeDetectionStrategy, Component, ElementRef, afterNextRender, computed, inject, input, signal, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  afterNextRender,
+  computed,
+  inject,
+  input,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { CaptionOverlayComponent } from '../caption-overlay/caption-overlay.component';
 import { VIDEO_SURFACE } from '../../playback/video-surface';
+import { CaptionAppearance } from '../../models/caption-appearance.model';
+import { CAPTION_APPEARANCE_DEFAULTS } from '../../utils/caption-appearance-defaults';
 
 const DEFAULT_RATIO = 16 / 9;
 const MAX_FRAME_VIEWPORT_HEIGHT = 70;
@@ -14,6 +26,7 @@ const MAX_FRAME_VIEWPORT_HEIGHT = 70;
 export class VideoPlayerComponent {
   readonly source = input.required<string>();
   readonly caption = input('');
+  readonly appearance = input<CaptionAppearance>(CAPTION_APPEARANCE_DEFAULTS);
   private readonly surface = inject(VIDEO_SURFACE);
   private readonly video = viewChild.required<ElementRef<HTMLVideoElement>>('video');
   protected readonly ratio = signal(DEFAULT_RATIO);

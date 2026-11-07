@@ -181,6 +181,23 @@ describe('CaptionAppearanceService persistence', () => {
   });
 });
 
+describe('CaptionAppearanceService untrusted input', () => {
+  it('rejects a value of the wrong type from a control and keeps the previous value', () => {
+    const service = createService(() => new FakeStorage() as unknown as Storage);
+    const issues = service.updateAppearance({ fontSize: '2' as unknown as number });
+    expect(issues).toEqual([{ field: 'fontSize', reason: 'invalid' }]);
+    expect(service.appearance().fontSize).toBe(CAPTION_APPEARANCE_DEFAULTS.fontSize);
+  });
+
+  it('accepts a patch that arrives as untyped data and validates every field', () => {
+    const service = createService(() => new FakeStorage() as unknown as Storage);
+    const issues = service.updateAppearance({ captionPosition: 'top', fontFamily: 'Comic Sans' });
+    expect(issues).toEqual([{ field: 'fontFamily', reason: 'invalid' }]);
+    expect(service.appearance().captionPosition).toBe('top');
+    expect(service.appearance().fontFamily).toBe('app-default');
+  });
+});
+
 describe('CaptionAppearanceService contrast mode transitions', () => {
   it('normal shows default colours while keeping the viewer colours in state', () => {
     const service = createService(() => new FakeStorage() as unknown as Storage);
