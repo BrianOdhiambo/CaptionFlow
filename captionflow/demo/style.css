@@ -436,17 +436,38 @@ video {
     left: 12px
 }
 
-/* Caption settings drawer, opened from the CC button. Dark, right-hand, scrollable. */
+/* Caption settings panel, opened from the CC button. It sits beside the video, level with its top,
+ * and covers the transcript column. The player's overflow is released only while the panel is open. */
+.video-shell:has(.caption-settings-root:not([hidden])) {
+    overflow: visible
+}
+
 .caption-settings-root {
-    position: fixed;
-    top: 12px;
-    right: 12px;
-    bottom: 12px;
+    position: absolute;
+    top: 0;
+    left: calc(100% + 16px);
     z-index: 10;
-    width: min(360px, calc(100vw - 24px));
+    width: min(360px, 40vw);
     overflow: auto;
     border-radius: 16px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, .5)
+}
+
+.video-shell:fullscreen .caption-settings-root {
+    left: auto;
+    right: 12px;
+    top: 12px;
+    bottom: 12px;
+    width: min(360px, 40vw)
+}
+
+@media (max-width: 899px) {
+    .caption-settings-root,
+    .video-shell:fullscreen .caption-settings-root {
+        left: 0;
+        right: 0;
+        width: auto
+    }
 }
 
 .caption-settings-root[hidden] {
