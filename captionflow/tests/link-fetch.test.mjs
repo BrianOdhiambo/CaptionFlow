@@ -71,6 +71,27 @@ test('a video over the size limit is refused', async () => {
   );
 });
 
+test('a video served as a generic file type is accepted when its address ends in a video extension', async () => {
+  const result = await fetchVideoLink('https://example.com/files/clip.webm', {
+    maxBytes: 1024, lookup: publicLookup, fetchImpl: async () => response({ type: 'application/octet-stream' }),
+  });
+  assert.equal(result.contentType, 'video/webm');
+});
+
+test('a web page link explains that the video file address is needed', async () => {
+  await assert.rejects(
+    fetchVideoLink('https://example.com/watch', { maxBytes: 1024, lookup: publicLookup, fetchImpl: async () => response({ type: 'text/html' }) }),
+    error => error instanceof LinkError && error.status === 415 && /copy the address of the video file/.test(error.message),
+  );
+});
+
+test('a video over the size limit names the limit', async () => {
+  await assert.rejects(
+    fetchVideoLink('https://example.com/big.mp4', { maxBytes: 4 * 1024 * 1024, lookup: publicLookup, fetchImpl: async () => response({ headers: { 'content-length': String(9 * 1024 * 1024) } }) }),
+    error => error instanceof LinkError && error.status === 413 && /4 MB limit/.test(error.message),
+  );
+});
+
 test('too many redirects are refused', async () => {
   const fetchImpl = async () => response({ status: 301, type: 'text/html', headers: { location: 'https://example.com/again' } });
   await assert.rejects(
