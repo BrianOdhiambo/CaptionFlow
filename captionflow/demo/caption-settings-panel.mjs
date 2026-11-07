@@ -153,6 +153,12 @@ function buildPanel() {
   view.textButtons = text.buttons;
   view.textPicker = text.picker;
   textSection.append(text.row);
+  const highlightLabel = element('label', 'cs-check');
+  view.highlight = element('input');
+  view.highlight.type = 'checkbox';
+  view.highlight.addEventListener('change', () => { setCaptionStyle({ highlightWords: view.highlight.checked }); refresh(); });
+  highlightLabel.append(view.highlight, ' Highlight spoken words in the text color');
+  textSection.append(highlightLabel);
 
   const boxSection = element('div', 'cs-section');
   boxSection.append(element('span', 'cs-label', 'Background color'));
@@ -191,7 +197,13 @@ function buildPanel() {
   const preview = element('div', 'caption-preview');
   preview.setAttribute('aria-hidden', 'true');
   view.preview = preview;
-  preview.append(element('div', null, SAMPLE_CAPTION));
+  const sampleLine = element('div');
+  SAMPLE_CAPTION.split(' ').forEach((word, index) => {
+    if (index > 0) sampleLine.append(' ');
+    const span = element('span', index === 0 ? 'caption-word word-active' : 'caption-word', word);
+    sampleLine.append(span);
+  });
+  preview.append(sampleLine);
   view.notice = element('p', 'cs-notice');
   view.notice.setAttribute('role', 'status');
 
@@ -244,6 +256,7 @@ function refresh() {
   setPressed(view.textButtons, textColor);
   setPressed(view.boxButtons, boxColor);
   view.textPicker.value = textColor;
+  view.highlight.checked = style.highlightWords !== false;
   view.boxPicker.value = boxColor === 'transparent' ? DEFAULT_CAPTION_STYLE.background : boxColor;
   view.opacity.value = String(style.backgroundOpacity);
   view.opacityOutput.textContent = percent(style.backgroundOpacity);
@@ -253,6 +266,7 @@ function refresh() {
   for (const [name, value] of Object.entries(vars)) view.preview.style.setProperty(name, value);
   view.preview.classList.remove(...CONTRAST_CLASSES);
   view.preview.classList.add(contrastClass);
+  view.preview.classList.toggle('highlight-words', style.highlightWords !== false);
 
   view.notice.textContent = noticeText(style);
 }

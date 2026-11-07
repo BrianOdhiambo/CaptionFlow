@@ -32,6 +32,7 @@ export function createCaptionSettingsPort({ captionWrap, mount, fetch: fetchImpl
     for (const [name, value] of Object.entries(vars)) captionWrap.style.setProperty(name, value);
     captionWrap.classList.remove(...CONTRAST_CLASSES);
     captionWrap.classList.add(contrastClass);
+    captionWrap.classList.toggle('highlight-words', style.highlightWords !== false);
   }
 
   function close(reason) {

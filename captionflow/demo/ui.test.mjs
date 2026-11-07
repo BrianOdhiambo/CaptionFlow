@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { once } from 'node:events';
 import { JSDOM } from 'jsdom';
 import { createCaptionFlowDemoServer } from './server.mjs';
+import { SPEED_PRESETS, MIN_SPEED, MAX_SPEED, SPEED_STEP } from '../src/player-controls.mjs';
 
 const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
 const { document } = new JSDOM(html).window;
@@ -56,9 +57,70 @@ test('the CC and pace buttons expose their popups', () => {
   assert.equal($('#cc').getAttribute('aria-expanded'), 'false');
   assert.equal($('#cc').getAttribute('aria-controls'), 'caption-settings-root');
   assert.equal($('#pace-button').getAttribute('aria-expanded'), 'false');
-  assert.equal($('#pace-button').getAttribute('aria-haspopup'), 'menu');
-  const options = [...document.querySelectorAll('#pace-menu [role=menuitemradio]')].map(item => item.dataset.pace);
-  assert.deepEqual(options, ['normal', '0.25', '0.5', '0.75', '1.25', '1.5', '1.75', '2', 'manual']);
+  assert.equal($('#pace-button').getAttribute('aria-controls'), 'pace-menu');
+  assert.equal($('#pace-button').hasAttribute('aria-haspopup'), false, 'the pace panel is a disclosure, not a menu');
+});
+
+test('the pace panel offers speed presets, a custom slider and a separate pause toggle', () => {
+  const panel = $('#pace-menu');
+  assert.equal(panel.parentElement, $('#video-shell'));
+  assert.equal(panel.hidden, true);
+  const presets = [...panel.querySelectorAll('input[type=radio][name=speed]')].map(radio => Number(radio.value));
+  assert.deepEqual(presets, [...SPEED_PRESETS]);
+  assert.equal(panel.querySelector('input[name=speed]:checked').value, '1');
+  const slider = $('#speed-slider');
+  assert.equal(slider.type, 'range');
+  assert.deepEqual([Number(slider.min), Number(slider.max), Number(slider.step)], [MIN_SPEED, MAX_SPEED, SPEED_STEP]);
+  assert.ok(document.querySelector('label[for=speed-slider]'));
+  assert.equal(accessibleName($('#speed-down')), 'Slower');
+  assert.equal(accessibleName($('#speed-up')), 'Faster');
+  assert.equal($('#pause-each-caption').type, 'checkbox');
+  assert.equal($('#pause-each-caption').checked, false);
+});
+
+test('the transcript toggle sits in the bar and controls the transcript panel', () => {
+  const toggle = $('#transcript-toggle');
+  assert.ok(toggle.closest('.bar-right'));
+  assert.equal(toggle.getAttribute('aria-pressed'), 'true');
+  assert.equal(toggle.getAttribute('aria-controls'), 'transcript-panel');
+  assert.equal(accessibleName(toggle), 'Transcript');
+  assert.ok($('#transcript-panel').classList.contains('transcript-panel'));
+});
+
+test('the transcript options include a Summarise button, disabled until captions load', () => {
+  const button = $('#summarise-transcript');
+  assert.ok($('#transcript-options').contains(button));
+  assert.equal(button.disabled, true);
+  assert.match(button.textContent, /Summarise transcript/);
+});
+
+test('the transcript options live in a hidden disclosure in the panel header', () => {
+  const button = $('#transcript-options-button');
+  const options = $('#transcript-options');
+  assert.ok(button.closest('.transcript-header'), 'options button is in the transcript header');
+  assert.equal(button.getAttribute('aria-expanded'), 'false');
+  assert.equal(button.getAttribute('aria-controls'), 'transcript-options');
+  assert.equal(accessibleName(button), 'Transcript options');
+  assert.equal(options.hidden, true);
+  for (const id of ['follow', 'show-times', 'transcript-size', 'download-transcript']) {
+    assert.ok(options.querySelector(`#${id}`), `#${id} is inside #transcript-options`);
+  }
+});
+
+test('transcript search is one labelled row with named previous/next match buttons', () => {
+  const input = $('#transcript-search');
+  assert.ok(document.querySelector('label[for=transcript-search]'), 'search input keeps its label');
+  const row = input.closest('.search-row');
+  assert.ok(row, 'search input is in .search-row');
+  assert.equal(accessibleName($('#search-prev')), 'Previous match');
+  assert.equal(accessibleName($('#search-next')), 'Next match');
+  assert.ok(row.contains($('#search-prev')) && row.contains($('#search-next')));
+});
+
+test('the time readout sits in the left button group, after Next', () => {
+  const left = $('#player-bar .bar-left');
+  assert.equal($('#time').parentElement, left);
+  assert.equal($('#time').previousElementSibling, $('#next'));
 });
 
 test('the old controls under the video and in panel 3 are gone', () => {

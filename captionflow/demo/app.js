@@ -1,13 +1,15 @@
 import { selectActiveCue, nextCue, sentenceReplayRange } from '/player-sync.mjs';
 import { viewCaptionsForMode } from '/caption-view.mjs';
-import { HIDE_CONTROLS_AFTER_MS, shouldHideControls, shortcutFor, cueLabel } from '/player-controls.mjs';
+import { HIDE_CONTROLS_AFTER_MS, shouldHideControls, shortcutFor, cueLabel, clampSpeed, stepSpeed, speedLabel, paceSummary } from '/player-controls.mjs';
 import { connectCaptionSettingsPort } from '/caption-settings-port.mjs';
 import '/caption-settings-panel.mjs';
+import { wordTimings, activeWordIndex as spokenWordIndex } from '/caption-words.mjs';
 
 const byId = id => document.getElementById(id);
 const ids = ['video','video-file','caption-file','caption','caption-wrap','language','mode','replay','next','transcript','message','time-status','provider','generate','provider-note','hosted-consent-wrap','hosted-consent','download-json','download-transcript','demo-warning','caption-status',
-  'video-shell','player-bar','player-hint','play','time','seek','pace-button','pace-text','pace-menu','cc','mute','fullscreen','caption-settings-root',
-  'follow','show-times','transcript-size','transcript-search','search-prev','search-next','search-status','target-language','translate','translation-status','text-ai-consent','summarize','summary-status','summary-points'];
+  'video-shell','player-bar','player-hint','play','time','seek','pace-button','pace-text','pace-menu','speed-slider','speed-value','speed-down','speed-up','pause-each-caption','transcript-toggle','watch-layout','transcript-panel','cc','mute','fullscreen','caption-settings-root',
+  'transcript-options-button','transcript-options','follow','show-times','transcript-size','transcript-search','search-prev','search-next','search-status','summarise-transcript','target-language','translate','translation-status','text-ai-consent','summarize','summary-status','summary-points'];
+
 const els = Object.fromEntries(ids.map(id => [id, byId(id)]));
 let cues = [];
 let payload = null;
@@ -23,7 +25,8 @@ let videoSelectionVersion = 0;
 let isGenerating = false;
 let objectUrl = null;
 let providerAvailability = { fixture: true, local: true, hosted: false };
-let pace = 'normal';  // normal | 0.5 | 0.75 | 1.25 | 1.5 | 1.75 | 2 | manual
+let speed = 1;
+let pauseEachCaption = false;
 let matchIds = [];
 let matchIndex = -1;
 const timeLabel = t => `${Math.floor(t/60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
@@ -174,11 +177,52 @@ function transcriptText() {
   return cues.map(cue => `[${timeLabel(cue.start)}] ${cue.displayText}`).join('\n');
 }
 
+let wordCueId = null;
+let wordTimes = [];
+let wordSpans = [];
+let activeWordIndex = -1;
+
+function renderCaptionWords(cue) {
+  if (cue.id === wordCueId) return;
+  wordCueId = cue.id;
+  activeWordIndex = -1;
+  wordTimes = wordTimings(cue.displayText, cue.start, cue.end);
+  els.caption.replaceChildren();
+  wordSpans = wordTimes.map(({ word }, index) => {
+    if (index > 0) els.caption.append(' ');
+    const span = document.createElement('span');
+    span.className = 'caption-word';
+    span.textContent = word;
+    els.caption.append(span);
+    return span;
+  });
+}
+
+function updateActiveWord(seconds) {
+  const index = spokenWordIndex(wordTimes, seconds);
+  if (index === activeWordIndex) return;
+  if (activeWordIndex >= 0) wordSpans[activeWordIndex]?.classList.remove('word-active');
+  if (index >= 0) wordSpans[index].classList.add('word-active');
+  activeWordIndex = index;
+}
+
+function followSpokenWords() {
+  if (wordCueId !== null && !els.video.paused) updateActiveWord(els.video.currentTime || 0);
+  requestAnimationFrame(followSpokenWords);
+}
+requestAnimationFrame(followSpokenWords);
+
 function sync() {
   const cue = selectActiveCue(cues, els.video.currentTime || 0);
   if (sentenceReplayUntil && (els.video.currentTime >= sentenceReplayUntil.end - 0.05 || els.video.currentTime < sentenceReplayUntil.start - 0.2)) sentenceReplayUntil = null;
-  els.caption.textContent = cue?.displayText ?? (cues.length ? ' ' :
-    (els['video-file'].files?.length ? 'Captions not loaded yet' : 'Choose a video to begin.'));
+  if (cue) {
+    renderCaptionWords(cue);
+    updateActiveWord(els.video.currentTime || 0);
+  } else {
+    wordCueId = null;
+    els.caption.textContent = cues.length ? '' :
+      (els['video-file'].files?.length ? 'Captions not loaded yet' : 'Choose a video to begin.');
+  }
   if (skipManualPauseForCueId && cue?.id !== skipManualPauseForCueId) {
     skipManualPauseForCueId = null;
   }
@@ -195,7 +239,7 @@ function sync() {
   const label = cueLabel(cues, cue);
   els['time-status'].textContent = `Playback position: ${timeLabel(els.video.currentTime || 0)}${label ? ` · ${label}` : ''}`;
   updateTime();
-  if (cue && pace === 'manual' && !els.video.paused &&
+  if (cue && pauseEachCaption && !els.video.paused &&
       cue.id !== lastManualPausedId && cue.id !== skipManualPauseForCueId && !sentenceReplayUntil &&
       els.video.currentTime >= cue.start + 0.06) {
     lastManualPausedId = cue.id;
@@ -217,6 +261,7 @@ function setCaptions(data, nextSource) {
   sync();
   els['download-json'].disabled = false;
   els['download-transcript'].disabled = false;
+  els['summarise-transcript'].disabled = false;
   els.replay.disabled = false;
   els.next.disabled = false;
   els['demo-warning'].hidden = nextSource !== 'fixture';
@@ -230,6 +275,7 @@ function updateTextActions() {
   const ready = Boolean(payload?.transcript?.segments?.length) && source !== 'fixture';
   els.translate.disabled = !ready || !textAIAvailable || isTranslating;
   els.summarize.disabled = !ready || !textAIAvailable || isSummarizing;
+  els['summarise-transcript'].disabled = els.summarize.disabled;
 
 }
 function showCachedSummary() {
@@ -284,11 +330,8 @@ async function loadDemoCues() {
   setCaptions(data, 'fixture');
   message(`${cues.length} fictional sample captions loaded; they are NOT related to an arbitrary selected video.`);
 }
-function paceRate(value) {
-  return value === 'normal' || value === 'manual' ? 1 : Number(value);
-}
 function applyPace() {
-  els.video.playbackRate = paceRate(pace);
+  els.video.playbackRate = speed;
   lastManualPausedId = null;
   sentenceReplayUntil = null;
   sync();
@@ -317,7 +360,7 @@ els['video-file'].addEventListener('change', () => {
     clearTextOutputs();
     els.transcript.replaceChildren();
     els.caption.textContent = 'Choose a video to begin.';
-    els.replay.disabled = true; els.next.disabled = true; els['download-json'].disabled = true; els['download-transcript'].disabled = true;
+    els.replay.disabled = true; els.next.disabled = true; els['download-json'].disabled = true; els['download-transcript'].disabled = true; els['summarise-transcript'].disabled = true;
     message('No video or captions selected. Choose a video to continue.');
     return;
   }
@@ -332,7 +375,7 @@ els['video-file'].addEventListener('change', () => {
   els.caption.textContent = 'No captions yet';
   els.replay.disabled = true; els.next.disabled = true;
   els['download-json'].disabled = true;
-  els['download-transcript'].disabled = true;
+  els['download-transcript'].disabled = true; els['summarise-transcript'].disabled = true;
   els['demo-warning'].hidden = true;
   clearTextOutputs();
   message('Video opened. Select Local and generate matching timed captions, or load a transcript JSON for this exact clip.');
@@ -424,6 +467,35 @@ els['download-transcript'].addEventListener('click', () => {
   anchor.download = `${payload?.videoId || 'captionflow'}-${displayLanguage()}-transcript.txt`;
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+function openTranscriptOptions() {
+  els['transcript-options'].hidden = false;
+  els['transcript-options-button'].setAttribute('aria-expanded', 'true');
+  els.follow.focus();
+}
+function closeTranscriptOptions({ focusButton = false } = {}) {
+  if (els['transcript-options'].hidden) return;
+  els['transcript-options'].hidden = true;
+  els['transcript-options-button'].setAttribute('aria-expanded', 'false');
+  if (focusButton) els['transcript-options-button'].focus();
+}
+els['transcript-options-button'].addEventListener('click', () => {
+  if (els['transcript-options'].hidden) openTranscriptOptions(); else closeTranscriptOptions();
+});
+els['transcript-options'].addEventListener('keydown', event => {
+  if (event.key !== 'Escape') return;
+  event.preventDefault();
+  closeTranscriptOptions({ focusButton: true });
+});
+els['transcript-options'].addEventListener('focusout', event => {
+  if (event.relatedTarget && !els['transcript-options-button'].parentElement.contains(event.relatedTarget)) closeTranscriptOptions();
+});
+document.addEventListener('pointerdown', event => {
+  if (!els['transcript-options-button'].parentElement.contains(event.target)) closeTranscriptOptions();
+});
+els['summarise-transcript'].addEventListener('click', () => {
+  closeTranscriptOptions({ focusButton: true });
+  els.summarize.click();
 });
 function replay() {
   const range = sentenceReplayRange(payload?.transcript?.segments ?? cues, els.video.currentTime);
@@ -536,8 +608,6 @@ els.summarize.addEventListener('click', async () => {
 });
 // In-player control bar. Everything lives inside #video-shell so full screen keeps it all.
 const shell = els['video-shell'];
-const PACE_LABELS = { normal: 'Normal (1×)', '0.25': '0.25× (extra slow)', '0.5': '0.5× (very slow)', '0.75': '0.75× (slow)', '1.25': '1.25×', '1.5': '1.5×', '1.75': '1.75×', '2': '2×', manual: 'Pause at each caption' };
-const PACE_SHORT = { normal: 'Normal', '0.25': '0.25×', '0.5': '0.5×', '0.75': '0.75×', '1.25': '1.25×', '1.5': '1.5×', '1.75': '1.75×', '2': '2×', manual: 'Pause' };
 const SEEK_STEP_SECONDS = 5;
 let lastActivity = Date.now();
 let hideTimer = null;
@@ -618,18 +688,28 @@ function updateFullscreenButton() {
   els.fullscreen.title = `${on ? 'Exit full screen' : 'Full screen'} (F)`;
 }
 
-const paceItems = [...els['pace-menu'].querySelectorAll('[data-pace]')];
-function setPace(value) {
-  pace = value;
-  for (const item of paceItems) item.setAttribute('aria-checked', String(item.dataset.pace === value));
-  els['pace-text'].textContent = `Pace: ${PACE_SHORT[value]}`;
-  els['pace-button'].setAttribute('aria-label', `Reading pace: ${PACE_LABELS[value]}`);
+const speedRadios = [...els['pace-menu'].querySelectorAll('input[name=speed]')];
+function updatePaceButton() {
+  const summary = paceSummary({ speed, pauseEachCaption });
+  els['pace-text'].textContent = summary.text;
+  els['pace-button'].setAttribute('aria-label', summary.ariaLabel);
+}
+function setSpeed(value, { announce = true } = {}) {
+  speed = clampSpeed(value);
+  els['speed-slider'].value = String(speed);
+  els['speed-slider'].setAttribute('aria-valuetext', speed === 1 ? 'Normal speed' : `${speed} times speed`);
+  els['speed-value'].textContent = `${speed}×`;
+  for (const radio of speedRadios) radio.checked = Number(radio.value) === speed;
+  els['speed-down'].disabled = speed === stepSpeed(speed, -1);
+  els['speed-up'].disabled = speed === stepSpeed(speed, 1);
+  updatePaceButton();
   applyPace();
+  if (announce) message(`Speed: ${speedLabel(speed)}.`);
 }
 function openPaceMenu() {
   els['pace-menu'].hidden = false;
   els['pace-button'].setAttribute('aria-expanded', 'true');
-  (paceItems.find(item => item.getAttribute('aria-checked') === 'true') ?? paceItems[0]).focus();
+  (speedRadios.find(radio => radio.checked) ?? els['speed-slider']).focus();
   noteActivity();
 }
 function closePaceMenu({ focusButton = false } = {}) {
@@ -642,25 +722,43 @@ function closePaceMenu({ focusButton = false } = {}) {
 els['pace-button'].addEventListener('click', () => {
   if (els['pace-menu'].hidden) openPaceMenu(); else closePaceMenu();
 });
-for (const item of paceItems) item.addEventListener('click', () => {
-  setPace(item.dataset.pace);
-  closePaceMenu({ focusButton: true });
-  message(`Reading pace: ${PACE_LABELS[pace]}.`);
+for (const radio of speedRadios) radio.addEventListener('change', () => setSpeed(radio.value));
+els['speed-slider'].addEventListener('input', () => setSpeed(els['speed-slider'].value));
+els['speed-down'].addEventListener('click', () => setSpeed(stepSpeed(speed, -1)));
+els['speed-up'].addEventListener('click', () => setSpeed(stepSpeed(speed, 1)));
+els['pause-each-caption'].addEventListener('change', () => {
+  pauseEachCaption = els['pause-each-caption'].checked;
+  updatePaceButton();
+  applyPace();
+  message(pauseEachCaption ? 'Pausing at each caption.' : 'No longer pausing at each caption.');
 });
 els['pace-menu'].addEventListener('keydown', event => {
-  event.stopPropagation();  // keep player shortcuts out of the menu
-  const index = paceItems.indexOf(document.activeElement);
-  const move = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: paceItems.length - 1 }[event.key];
-  if (move !== undefined) {
-    event.preventDefault();
-    paceItems[(move + paceItems.length) % paceItems.length].focus();
-  } else if (event.key === 'Escape') {
+  event.stopPropagation();  // keep player shortcuts (arrows seek) out of the panel
+  if (event.key === 'Escape') {
     event.preventDefault();
     closePaceMenu({ focusButton: true });
-  } else if (event.key === 'Tab') closePaceMenu();
+  }
+});
+const insidePace = node => els['pace-menu'].contains(node) || els['pace-button'].contains(node);
+els['pace-menu'].addEventListener('focusout', event => {
+  if (event.relatedTarget && !insidePace(event.relatedTarget)) closePaceMenu();
 });
 document.addEventListener('pointerdown', event => {
-  if (!els['pace-menu'].hidden && !els['pace-button'].parentElement.contains(event.target)) closePaceMenu();
+  if (!els['pace-menu'].hidden && !insidePace(event.target)) closePaceMenu();
+});
+
+const TRANSCRIPT_VISIBLE_KEY = 'captionflow.transcriptVisible';
+function setTranscriptVisible(visible) {
+  els['transcript-panel'].hidden = !visible;
+  els['watch-layout'].classList.toggle('transcript-hidden', !visible);
+  els['transcript-toggle'].setAttribute('aria-pressed', String(visible));
+  els['transcript-toggle'].title = visible ? 'Hide transcript' : 'Show transcript';
+  try { browserStorage()?.setItem(TRANSCRIPT_VISIBLE_KEY, String(visible)); } catch {}
+  if (visible) followActiveLine();
+}
+els['transcript-toggle'].addEventListener('click', () => {
+  setTranscriptVisible(els['transcript-panel'].hidden);
+  noteActivity();
 });
 
 // Shown in the settings mount until the caption settings panel registers.
@@ -729,6 +827,8 @@ const shortcutActions = {
   mute: toggleMute,
   seekBack: () => seekBy(-SEEK_STEP_SECONDS),
   seekForward: () => seekBy(SEEK_STEP_SECONDS),
+  speedUp: () => setSpeed(stepSpeed(speed, 1)),
+  speedDown: () => setSpeed(stepSpeed(speed, -1)),
 };
 shell.addEventListener('keydown', event => {
   noteActivity();
@@ -765,6 +865,8 @@ if ('ResizeObserver' in window) {
 updatePlayButton();
 updateMuteButton();
 updateTime();
+setSpeed(1, { announce: false });
+setTranscriptVisible((() => { try { return browserStorage()?.getItem(TRANSCRIPT_VISIBLE_KEY) !== 'false'; } catch { return true; } })());
 
 els.video.addEventListener('timeupdate', sync);
 els.video.addEventListener('seeking', sync);

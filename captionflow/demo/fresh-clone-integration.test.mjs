@@ -15,8 +15,8 @@ test('all new text-AI control IDs exist and the player bar remains intact', asyn
   assert.match(app, /connectCaptionSettingsPort/);
   assert.match(app, /\/api\/translate/);
   assert.match(app, /\/api\/summarize/);
-  assert.match(html, /data-pace="0\.25"/);
-  assert.match(html, /data-pace="0\.5"/);
+  assert.match(html, /name="speed" value="0\.25"/);
+  assert.match(html, /name="speed" value="0\.5"/);
   assert.match(html, /class="watch-layout"/);
 });
 

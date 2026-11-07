@@ -32,6 +32,7 @@ const staticFiles = {
   '/caption-settings-port.mjs': ['../src/caption-settings-port.mjs', 'text/javascript; charset=utf-8'],
   '/caption-settings-panel.mjs': ['caption-settings-panel.mjs', 'text/javascript; charset=utf-8'],
   '/caption-contrast.mjs': ['../src/caption-contrast.mjs', 'text/javascript; charset=utf-8'],
+  '/caption-words.mjs': ['../src/caption-words.mjs', 'text/javascript; charset=utf-8'],
 };
 const supportedMedia = new Set(['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-m4v']);
 
