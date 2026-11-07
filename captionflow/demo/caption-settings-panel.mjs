@@ -9,173 +9,211 @@ import {
 import { CONTRAST_CLASSES, DEFAULT_CAPTION_STYLE, captionStyleToCss } from '/player-controls.mjs';
 import { CONTRAST_TARGET_RATIO, captionContrast } from '/caption-contrast.mjs';
 
+const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif';
+const SERIF = 'Georgia, "Times New Roman", serif';
+const MONO = 'ui-monospace, Menlo, Consolas, monospace';
+
 const FONT_FAMILIES = Object.freeze([
   { value: 'inherit', label: 'App default' },
-  { value: 'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif', label: 'Sans-serif' },
-  { value: 'Georgia, "Times New Roman", serif', label: 'Serif' },
-  { value: 'ui-monospace, Menlo, Consolas, monospace', label: 'Monospace' },
+  { value: SANS, label: 'Sans-serif' },
+  { value: SERIF, label: 'Serif' },
+  { value: MONO, label: 'Monospace' },
+]);
+
+const FONT_SAMPLES = Object.freeze([
+  { value: SANS, label: 'Sans-serif sample' },
+  { value: SERIF, label: 'Serif sample' },
+  { value: MONO, label: 'Monospace sample' },
+]);
+
+const TEXT_COLORS = Object.freeze([
+  { value: '#ffffff', label: 'White' },
+  { value: '#facc15', label: 'Yellow' },
+  { value: '#22c55e', label: 'Green' },
+  { value: '#22d3ee', label: 'Cyan' },
+  { value: '#d946ef', label: 'Purple' },
+]);
+
+const BOX_COLORS = Object.freeze([
+  { value: '#000000', label: 'Black' },
+  { value: '#0f172a', label: 'Dark navy' },
+  { value: '#0057ff', label: 'Blue' },
+  { value: 'transparent', label: 'Transparent' },
 ]);
 
 const CONTRAST_MODES = Object.freeze([
   { value: 'normal', label: 'Normal' },
-  { value: 'high', label: 'High contrast (white on black)' },
-  { value: 'inverted', label: 'Inverted (swap text and box)' },
+  { value: 'high', label: 'High' },
+  { value: 'inverted', label: 'Inverted' },
 ]);
 
-const PRESETS = Object.freeze([
-  { label: 'White on dark', color: '#ffffff', background: '#1a1a1a' },
-  { label: 'Yellow on black', color: '#ffff00', background: '#000000' },
-  { label: 'Black on white', color: '#000000', background: '#ffffff' },
-  { label: 'Cyan on black', color: '#00ffff', background: '#000000' },
-]);
-
-const SAMPLE_CAPTION = 'A sample caption, so you can see the colours and size before you apply.';
+const SAMPLE_CAPTION = 'Sample caption text';
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const percent = value => `${Math.round(value * 100)}%`;
-const hexOrDefault = (value, fallback) => (HEX_COLOR.test(value) ? value : fallback);
+const hexOrDefault = (value, fallback) => (HEX_COLOR.test(value) ? value.toLowerCase() : fallback);
 
-function selectWith(options) {
-  const select = document.createElement('select');
-  select.className = 'cs-input';
-  for (const option of options) {
-    const element = document.createElement('option');
-    element.value = option.value;
-    element.textContent = option.label;
-    select.append(element);
-  }
-  return select;
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
 }
 
-function rangeInput(min, max, step) {
-  const input = document.createElement('input');
-  input.type = 'range';
-  input.className = 'cs-range';
-  input.min = String(min);
-  input.max = String(max);
-  input.step = String(step);
-  return input;
+function pressableButton(className, label) {
+  const button = element('button', className);
+  button.type = 'button';
+  button.setAttribute('aria-label', label);
+  button.setAttribute('aria-pressed', 'false');
+  return button;
 }
 
-function colorInput() {
-  const input = document.createElement('input');
-  input.type = 'color';
-  input.className = 'cs-color';
-  return input;
-}
-
-function fieldWithLabel(id, text, control) {
-  const wrap = document.createElement('div');
-  wrap.className = 'cs-field';
-  const label = document.createElement('label');
+function fieldLabel(id, text) {
+  const label = element('label', 'cs-label', text);
   label.htmlFor = id;
-  label.className = 'cs-label';
-  label.textContent = text;
-  control.id = id;
-  wrap.append(label, control);
-  return { wrap, label };
+  return label;
+}
+
+function swatchRow(items, onPick, customLabel) {
+  const row = element('div', 'cs-swatches');
+  const buttons = items.map(item => {
+    const button = pressableButton('cs-swatch', item.label);
+    button.style.setProperty('--swatch', item.value);
+    if (item.value === 'transparent') button.classList.add('cs-swatch-transparent');
+    button.addEventListener('click', () => onPick(item.value));
+    row.append(button);
+    return { button, value: item.value };
+  });
+  const custom = element('label', 'cs-swatch cs-swatch-custom');
+  custom.title = customLabel;
+  const picker = element('input');
+  picker.type = 'color';
+  picker.setAttribute('aria-label', customLabel);
+  picker.addEventListener('input', () => onPick(picker.value));
+  custom.append(picker);
+  row.append(custom);
+  return { row, buttons, picker };
 }
 
 function buildPanel() {
   const view = {};
-  const form = document.createElement('form');
-  form.className = 'caption-settings-panel';
+  const form = element('form', 'caption-settings-panel');
   form.noValidate = true;
   form.setAttribute('aria-labelledby', 'cs-title');
 
-  const title = document.createElement('h2');
+  const header = element('div', 'cs-header');
+  header.append(element('span', 'cs-logo', 'Aa'));
+  const title = element('h2', 'cs-title', 'Caption Settings');
   title.id = 'cs-title';
-  title.className = 'cs-title';
-  title.textContent = 'Caption settings';
+  const close = pressableButton('cs-icon', 'Close caption settings');
+  close.removeAttribute('aria-pressed');
+  close.textContent = '✕';
+  close.addEventListener('click', () => cancelAndClose());
+  header.append(title, close);
 
-  view.preview = document.createElement('div');
-  view.preview.className = 'caption-preview';
-  view.preview.setAttribute('aria-hidden', 'true');
-  const sample = document.createElement('div');
-  sample.textContent = SAMPLE_CAPTION;
-  view.preview.append(sample);
+  const fontSection = element('div', 'cs-section');
+  fontSection.append(fieldLabel('cs-font', 'Font family'));
+  const fontRow = element('div', 'cs-row');
+  view.family = element('select', 'cs-select');
+  view.family.id = 'cs-font';
+  for (const item of FONT_FAMILIES) {
+    const option = element('option', null, item.label);
+    option.value = item.value;
+    view.family.append(option);
+  }
+  view.family.addEventListener('change', () => { setCaptionStyle({ fontFamily: view.family.value }); refresh(); });
+  fontRow.append(view.family);
+  view.fontSamples = FONT_SAMPLES.map(item => {
+    const button = pressableButton('cs-font-sample', item.label);
+    button.textContent = 'Aa';
+    button.style.fontFamily = item.value;
+    button.addEventListener('click', () => { setCaptionStyle({ fontFamily: item.value }); refresh(); });
+    fontRow.append(button);
+    return { button, value: item.value };
+  });
+  fontSection.append(fontRow);
 
-  view.notice = document.createElement('p');
-  view.notice.className = 'cs-notice';
+  const sizeSection = element('div', 'cs-section');
+  sizeSection.append(fieldLabel('cs-size', 'Font size'));
+  const sizeRow = element('div', 'cs-slider-row');
+  view.size = element('input', 'cs-range');
+  view.size.type = 'range';
+  view.size.id = 'cs-size';
+  view.size.min = '0.8';
+  view.size.max = '2.5';
+  view.size.step = '0.05';
+  view.size.addEventListener('input', () => { setCaptionStyle({ fontScale: Number(view.size.value) }); refresh(); });
+  view.sizeOutput = element('output', 'cs-output');
+  view.sizeOutput.htmlFor = 'cs-size';
+  sizeRow.append(view.size, view.sizeOutput);
+  sizeSection.append(sizeRow);
+
+  const textSection = element('div', 'cs-section');
+  textSection.append(element('span', 'cs-label', 'Text color'));
+  const text = swatchRow(TEXT_COLORS, value => { setCaptionStyle({ color: value }); refresh(); }, 'Custom text colour');
+  view.textButtons = text.buttons;
+  view.textPicker = text.picker;
+  textSection.append(text.row);
+
+  const boxSection = element('div', 'cs-section');
+  boxSection.append(element('span', 'cs-label', 'Background color'));
+  const box = swatchRow(BOX_COLORS, value => { setCaptionStyle({ background: value }); refresh(); }, 'Custom background colour');
+  view.boxButtons = box.buttons;
+  view.boxPicker = box.picker;
+  boxSection.append(box.row);
+
+  const opacitySection = element('div', 'cs-section');
+  opacitySection.append(fieldLabel('cs-opacity', 'Background opacity'));
+  const opacityRow = element('div', 'cs-slider-row');
+  view.opacity = element('input', 'cs-range');
+  view.opacity.type = 'range';
+  view.opacity.id = 'cs-opacity';
+  view.opacity.min = '0.25';
+  view.opacity.max = '1';
+  view.opacity.step = '0.05';
+  view.opacity.addEventListener('input', () => { setCaptionStyle({ backgroundOpacity: Number(view.opacity.value) }); refresh(); });
+  view.opacityOutput = element('output', 'cs-output');
+  view.opacityOutput.htmlFor = 'cs-opacity';
+  opacityRow.append(view.opacity, view.opacityOutput);
+  opacitySection.append(opacityRow);
+
+  const contrastSection = element('div', 'cs-section');
+  contrastSection.append(element('span', 'cs-label', 'Contrast mode'));
+  const contrastRow = element('div', 'cs-segmented');
+  view.contrastButtons = CONTRAST_MODES.map(item => {
+    const button = pressableButton('cs-segment', `${item.label} contrast`);
+    button.textContent = item.label;
+    button.addEventListener('click', () => { setCaptionStyle({ contrast: item.value }); refresh(); });
+    contrastRow.append(button);
+    return { button, value: item.value };
+  });
+  contrastSection.append(contrastRow);
+
+  const preview = element('div', 'caption-preview');
+  preview.setAttribute('aria-hidden', 'true');
+  view.preview = preview;
+  preview.append(element('div', null, SAMPLE_CAPTION));
+  view.notice = element('p', 'cs-notice');
   view.notice.setAttribute('role', 'status');
 
-  const presetGroup = document.createElement('fieldset');
-  presetGroup.className = 'cs-presets';
-  const presetLegend = document.createElement('legend');
-  presetLegend.className = 'cs-label';
-  presetLegend.textContent = 'Presets';
-  presetGroup.append(presetLegend);
-  view.presetButtons = PRESETS.map(preset => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'cs-button';
-    button.textContent = preset.label;
-    button.addEventListener('click', () => {
-      setCaptionStyle({ color: preset.color, background: preset.background, backgroundOpacity: 1, contrast: 'normal' });
-      refresh();
-    });
-    presetGroup.append(button);
-    return { button, preset };
-  });
-
-  view.size = rangeInput(0.8, 2.5, 0.1);
-  const size = fieldWithLabel('cs-size', 'Text size', view.size);
-  view.sizeLabel = size.label;
-  view.size.addEventListener('input', () => { setCaptionStyle({ fontScale: Number(view.size.value) }); refresh(); });
-
-  view.family = selectWith(FONT_FAMILIES);
-  view.family.addEventListener('change', () => { setCaptionStyle({ fontFamily: view.family.value }); refresh(); });
-
-  view.color = colorInput();
-  view.color.addEventListener('input', () => { setCaptionStyle({ color: view.color.value }); refresh(); });
-
-  view.background = colorInput();
-  view.background.addEventListener('input', () => { setCaptionStyle({ background: view.background.value }); refresh(); });
-
-  view.opacity = rangeInput(0.25, 1, 0.05);
-  const opacity = fieldWithLabel('cs-opacity', 'Background opacity', view.opacity);
-  view.opacityLabel = opacity.label;
-  view.opacity.addEventListener('input', () => { setCaptionStyle({ backgroundOpacity: Number(view.opacity.value) }); refresh(); });
-
-  view.contrast = selectWith(CONTRAST_MODES);
-  view.contrast.addEventListener('change', () => { setCaptionStyle({ contrast: view.contrast.value }); refresh(); });
-
-  const grid = document.createElement('div');
-  grid.className = 'cs-grid';
-  grid.append(
-    size.wrap,
-    fieldWithLabel('cs-font', 'Font', view.family).wrap,
-    fieldWithLabel('cs-color-text', 'Text color', view.color).wrap,
-    fieldWithLabel('cs-color-box', 'Background color', view.background).wrap,
-    opacity.wrap,
-    fieldWithLabel('cs-contrast', 'Contrast mode', view.contrast).wrap,
-  );
-
-  const actions = document.createElement('div');
-  actions.className = 'cs-actions';
-  const reset = document.createElement('button');
+  const footer = element('div', 'cs-footer');
+  const reset = element('button', 'cs-reset', '↻ Reset to Default');
   reset.type = 'button';
-  reset.className = 'cs-button';
-  reset.textContent = 'Reset to defaults';
   reset.addEventListener('click', () => { resetCaptionStyle(); refresh(); });
-  const cancel = document.createElement('button');
-  cancel.type = 'button';
-  cancel.className = 'cs-button';
-  cancel.textContent = 'Cancel';
-  cancel.addEventListener('click', () => cancelAndClose());
-  const apply = document.createElement('button');
+  const apply = element('button', 'cs-primary', 'Apply');
   apply.type = 'submit';
-  apply.className = 'cs-button cs-primary';
-  apply.textContent = 'Apply and save';
-  actions.append(reset, cancel, apply);
+  footer.append(reset, apply);
   form.addEventListener('submit', event => { event.preventDefault(); applyAndClose(); });
 
-  form.append(title, view.preview, view.notice, presetGroup, grid, actions);
+  form.append(header, fontSection, sizeSection, textSection, boxSection, opacitySection, contrastSection, preview, view.notice, footer);
   return { form, view };
 }
 
 let view = null;
 
 function noticeText(style) {
+  if (style.background === 'transparent') {
+    return 'No box behind the text, so readability depends entirely on the video. Consider a background colour or more opacity.';
+  }
   const result = captionContrast(style);
   if (!result) return 'Use a six-digit colour such as #ffffff to check contrast.';
   const ratio = result.worstCaseRatio.toFixed(2);
@@ -188,17 +226,28 @@ function noticeText(style) {
   return `Meets the ${CONTRAST_TARGET_RATIO} to 1 guideline for captions.`;
 }
 
+function setPressed(buttons, value) {
+  for (const { button, value: itemValue } of buttons) {
+    button.setAttribute('aria-pressed', String(itemValue === value));
+  }
+}
+
 function refresh() {
   if (!view) return;
   const style = getCaptionStyle();
   view.size.value = String(style.fontScale);
-  view.sizeLabel.textContent = `Text size: ${percent(style.fontScale)}`;
+  view.sizeOutput.textContent = percent(style.fontScale);
   view.family.value = FONT_FAMILIES.some(item => item.value === style.fontFamily) ? style.fontFamily : 'inherit';
-  view.color.value = hexOrDefault(style.color, DEFAULT_CAPTION_STYLE.color);
-  view.background.value = hexOrDefault(style.background, DEFAULT_CAPTION_STYLE.background);
+  setPressed(view.fontSamples, style.fontFamily);
+  const textColor = hexOrDefault(style.color, DEFAULT_CAPTION_STYLE.color);
+  const boxColor = style.background === 'transparent' ? 'transparent' : hexOrDefault(style.background, DEFAULT_CAPTION_STYLE.background);
+  setPressed(view.textButtons, textColor);
+  setPressed(view.boxButtons, boxColor);
+  view.textPicker.value = textColor;
+  view.boxPicker.value = boxColor === 'transparent' ? DEFAULT_CAPTION_STYLE.background : boxColor;
   view.opacity.value = String(style.backgroundOpacity);
-  view.opacityLabel.textContent = `Background opacity: ${percent(style.backgroundOpacity)}`;
-  view.contrast.value = style.contrast;
+  view.opacityOutput.textContent = percent(style.backgroundOpacity);
+  setPressed(view.contrastButtons, style.contrast);
 
   const { vars, contrastClass } = captionStyleToCss(style);
   for (const [name, value] of Object.entries(vars)) view.preview.style.setProperty(name, value);
@@ -206,11 +255,6 @@ function refresh() {
   view.preview.classList.add(contrastClass);
 
   view.notice.textContent = noticeText(style);
-  for (const { button, preset } of view.presetButtons) {
-    const pressed = style.color === preset.color && style.background === preset.background
-      && style.backgroundOpacity === 1 && style.contrast === 'normal';
-    button.setAttribute('aria-pressed', String(pressed));
-  }
 }
 
 registerCaptionSettingsPanel({
