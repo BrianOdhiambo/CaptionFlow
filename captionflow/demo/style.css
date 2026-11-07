@@ -137,7 +137,13 @@ input:focus-visible {
     position: relative;
     border-radius: 10px;
     overflow: hidden;
-    min-height: 260px
+    min-height: 260px;
+    /* The bar's text/layout breakpoints below react to this element's own
+     * rendered width, not the viewport: the transcript panel's two-column
+     * grid (.watch-layout) caps #video-shell well under the viewport width
+     * once it's >= 900px wide, so a viewport media query would be wrong here. */
+    container-type: inline-size;
+    container-name: player-shell
 }
 
 video {
@@ -225,11 +231,13 @@ video {
     cursor: none
 }
 
-/* Between the phone layout and a full desktop window, the bar's button text
- * no longer fits one row; without this, the right-hand buttons (CC, Mute,
- * Full screen) overflow #video-shell's `overflow: hidden` and become
- * invisible and unclickable. Names stay for screen readers via aria-label. */
-@media (max-width: 899px) {
+/* Below this player width, the bar's button text no longer fits one row;
+ * without this, the right-hand buttons (CC, Mute, Full screen) overflow
+ * #video-shell's `overflow: hidden` and become invisible and unclickable.
+ * Names stay for screen readers via aria-label. A container query, not a
+ * viewport one: the transcript panel's two-column layout keeps #video-shell
+ * well under the viewport width on most desktop windows. */
+@container player-shell (max-width: 760px) {
     .bar-text {
         display: none
     }
@@ -268,6 +276,15 @@ video {
     display: flex;
     align-items: center;
     gap: 4px
+}
+
+/* Invisible by default: .bar-left/.bar-right stay direct grid items of
+ * .player-bar, placed by their own grid-area. Overridden to a real flex
+ * row only at the narrowest player widths (see the container query below),
+ * so the two groups wrap onto their own row instead of overlapping when
+ * there isn't room for both on one line. */
+.bar-buttons {
+    display: contents
 }
 
 .bar-left {
@@ -440,12 +457,17 @@ video {
     }
 }
 
-/* Phone: seek bar on its own row, icons only (names stay for screen readers). */
+/* Phone viewport: the page itself goes to one column. Unrelated to the bar. */
 @media (max-width: 599px) {
     main {
         padding: 0 12px
     }
+}
 
+/* Narrow player: seek bar on its own row, icons only. A container query
+ * (see #video-shell above) because the transcript panel's layout can make
+ * the player this narrow well before the page itself reaches phone width. */
+@container player-shell (max-width: 560px) {
     .player-bar {
         grid-template-columns: minmax(0, 1fr) auto;
         grid-template-areas:
@@ -456,20 +478,33 @@ video {
         padding: 16px 4px 4px
     }
 
-    .bar-text {
-        display: none
-    }
-
-    .bar-btn {
-        padding: 6px
-    }
-
-    .bar-group {
-        gap: 0
-    }
-
     .pace-menu {
         right: -96px
+    }
+}
+
+/* Even on a narrow phone, the left (Play/Replay/Next) and right (Pace/CC/
+ * Mute/Full screen) groups can together need more than one row's width at
+ * 44px tap targets each. Below that point give them their own row instead
+ * of squeezing both into "left right": without this they overlap and the
+ * one painted on top (bar-right, later in source order) silently swallows
+ * clicks meant for the other (e.g. Next becomes unclickable). flex-wrap
+ * finds the right breakpoint itself, for any button set or icon size. */
+@container player-shell (max-width: 340px) {
+    .player-bar {
+        grid-template-areas:
+            "hint hint"
+            "seek time"
+            "buttons buttons"
+    }
+
+    .bar-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 4px 8px;
+        grid-area: buttons
     }
 }
 
@@ -616,4 +651,93 @@ button:disabled {
     border-radius: 7px;
     line-height: 1.5;
     font-size: .93rem;
+}
+
+.watch-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+    align-items: start
+}
+
+.watch-main,
+.transcript-panel {
+    min-width: 0
+}
+
+.transcript-panel h3 {
+    margin: 0 0 6px;
+    font-size: 1.05rem
+}
+
+.transcript-tools {
+    margin: 8px 0 12px
+}
+
+.transcript {
+    position: relative
+}
+
+.transcript[data-size=large] button {
+    font-size: 1.15rem
+}
+
+.transcript[data-size=xlarge] button {
+    font-size: 1.35rem
+}
+
+.transcript.hide-times .time {
+    display: none
+}
+
+.transcript [aria-current=true] {
+    font-weight: 700
+}
+
+.transcript-search {
+    margin-bottom: 10px
+}
+
+.transcript-search label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px
+}
+
+.transcript-search input[type=search] {
+    width: 100%;
+    border: 1px solid #aebdc9;
+    border-radius: 8px;
+    padding: 10px;
+    background: white;
+    color: #1b3043
+}
+
+.transcript-search .actions {
+    margin-top: 8px
+}
+
+.transcript mark {
+    background: #ffe38a;
+    color: #13263a;
+    padding: 0 2px;
+    border-radius: 3px
+}
+
+.transcript .match button {
+    border-left: 3px solid #df8f2a
+}
+
+.transcript .match-current button {
+    background: #fff1d6
+}
+
+@media(min-width:900px) {
+    .watch-layout {
+        grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr)
+    }
+
+    .transcript {
+        max-height: 460px
+    }
 }

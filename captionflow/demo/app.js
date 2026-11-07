@@ -4,8 +4,9 @@ import { HIDE_CONTROLS_AFTER_MS, shouldHideControls, shortcutFor, cueLabel } fro
 import { connectCaptionSettingsPort } from '/caption-settings-port.mjs';
 
 const byId = id => document.getElementById(id);
-const ids = ['video','video-file','caption-file','caption','caption-wrap','language','mode','replay','next','transcript','message','time-status','provider','generate','provider-note','hosted-consent-wrap','hosted-consent','download-json','demo-warning','caption-status',
-  'video-shell','player-bar','player-hint','play','time','seek','pace-button','pace-text','pace-menu','cc','mute','fullscreen','caption-settings-root'];
+const ids = ['video','video-file','caption-file','caption','caption-wrap','language','mode','replay','next','transcript','message','time-status','provider','generate','provider-note','hosted-consent-wrap','hosted-consent','download-json','download-transcript','demo-warning','caption-status',
+  'video-shell','player-bar','player-hint','play','time','seek','pace-button','pace-text','pace-menu','cc','mute','fullscreen','caption-settings-root',
+  'follow','show-times','transcript-size','transcript-search','search-prev','search-next','search-status'];
 const els = Object.fromEntries(ids.map(id => [id, byId(id)]));
 let cues = [];
 let payload = null;
@@ -18,6 +19,8 @@ let isGenerating = false;
 let objectUrl = null;
 let providerAvailability = { fixture: true, local: true, hosted: false };
 let pace = 'normal';  // normal | slow | manual
+let matchIds = [];
+let matchIndex = -1;
 const timeLabel = t => `${Math.floor(t/60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 const message = text => {
   els.message.textContent = text;
@@ -72,6 +75,7 @@ function renderTranscript() {
     timestamp.className = 'time';
     timestamp.textContent = timeLabel(cue.start);
     const text = document.createElement('span');
+    text.className = 'line-text';
     text.textContent = cue.displayText;
     button.append(timestamp, ' ', text);
     if (cue.status && cue.status !== 'ready') {
@@ -88,6 +92,81 @@ function renderTranscript() {
     li.append(button);
     els.transcript.append(li);
   }
+  applySearch();
+}
+
+function appendHighlighted(parent, text, query) {
+  parent.replaceChildren();
+  if (!query) {
+    parent.textContent = text;
+    return;
+  }
+  const lowerText = text.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  let from = 0;
+  for (let at = lowerText.indexOf(lowerQuery); at !== -1; at = lowerText.indexOf(lowerQuery, from)) {
+    if (at > from) parent.append(text.slice(from, at));
+    const mark = document.createElement('mark');
+    mark.textContent = text.slice(at, at + query.length);
+    parent.append(mark);
+    from = at + query.length;
+  }
+  if (from < text.length) parent.append(text.slice(from));
+}
+
+function searchQuery() {
+  return els['transcript-search'].value.trim();
+}
+
+function applySearch() {
+  const query = searchQuery();
+  matchIds = query ? cues.filter(cue => cue.displayText.toLowerCase().includes(query.toLowerCase())).map(cue => cue.id) : [];
+  matchIndex = -1;
+  for (const li of els.transcript.children) {
+    const isMatch = matchIds.includes(li.dataset.id);
+    li.classList.toggle('match', isMatch);
+    li.classList.remove('match-current');
+    appendHighlighted(li.querySelector('.line-text'), cues.find(cue => cue.id === li.dataset.id).displayText, query);
+  }
+  updateSearchControls();
+}
+
+function updateSearchControls() {
+  const count = matchIds.length;
+  els['search-prev'].disabled = count === 0;
+  els['search-next'].disabled = count === 0;
+  if (!searchQuery()) els['search-status'].textContent = '';
+  else if (count === 0) els['search-status'].textContent = 'No matches in this transcript.';
+  else if (matchIndex < 0) els['search-status'].textContent = `${count} ${count === 1 ? 'match' : 'matches'}. Press Next match to start.`;
+  else els['search-status'].textContent = `Match ${matchIndex + 1} of ${count}.`;
+}
+
+function goToMatch(step) {
+  if (!matchIds.length) return;
+  const count = matchIds.length;
+  matchIndex = matchIndex < 0 ? (step > 0 ? 0 : count - 1) : (matchIndex + step + count) % count;
+  const id = matchIds[matchIndex];
+  const cue = cues.find(item => item.id === id);
+  for (const li of els.transcript.children) li.classList.toggle('match-current', li.dataset.id === id);
+  els.video.currentTime = cue.start;
+  const line = els.transcript.querySelector(`li[data-id="${CSS.escape(id)}"]`);
+  scrollLineIntoTranscript(line);
+  sync();
+  updateSearchControls();
+}
+
+function scrollLineIntoTranscript(line) {
+  if (!line) return;
+  const top = line.offsetTop - els.transcript.clientHeight / 2 + line.offsetHeight / 2;
+  els.transcript.scrollTo({ top, behavior: 'auto' });
+}
+
+function followActiveLine() {
+  scrollLineIntoTranscript(els.transcript.querySelector('.active'));
+}
+
+function transcriptText() {
+  return cues.map(cue => `[${timeLabel(cue.start)}] ${cue.displayText}`).join('\n');
 }
 
 function sync() {
@@ -99,7 +178,13 @@ function sync() {
   }
   if (cue?.id !== currentCueId) {
     currentCueId = cue?.id ?? null;
-    for (const li of els.transcript.children) li.classList.toggle('active', li.dataset.id === currentCueId);
+    for (const li of els.transcript.children) {
+      const isActive = li.dataset.id === currentCueId;
+      li.classList.toggle('active', isActive);
+      if (isActive) li.firstElementChild.setAttribute('aria-current', 'true');
+      else li.firstElementChild.removeAttribute('aria-current');
+    }
+    if (currentCueId && els.follow.checked) followActiveLine();
   }
   const label = cueLabel(cues, cue);
   els['time-status'].textContent = `Playback position: ${timeLabel(els.video.currentTime || 0)}${label ? ` · ${label}` : ''}`;
@@ -124,6 +209,7 @@ function setCaptions(data, nextSource) {
   renderTranscript();
   sync();
   els['download-json'].disabled = false;
+  els['download-transcript'].disabled = false;
   els.replay.disabled = false;
   els.next.disabled = false;
   els['demo-warning'].hidden = nextSource !== 'fixture';
@@ -185,7 +271,7 @@ els['video-file'].addEventListener('change', () => {
     cues = []; payload = null; currentCueId = null;
     els.transcript.replaceChildren();
     els.caption.textContent = 'Choose a video to begin.';
-    els.replay.disabled = true; els.next.disabled = true; els['download-json'].disabled = true;
+    els.replay.disabled = true; els.next.disabled = true; els['download-json'].disabled = true; els['download-transcript'].disabled = true;
     message('No video or captions selected. Choose a video to continue.');
     return;
   }
@@ -200,6 +286,7 @@ els['video-file'].addEventListener('change', () => {
   els.caption.textContent = 'No captions yet';
   els.replay.disabled = true; els.next.disabled = true;
   els['download-json'].disabled = true;
+  els['download-transcript'].disabled = true;
   els['demo-warning'].hidden = true;
   message('Video opened. Select Local and generate matching timed captions, or load a transcript JSON for this exact clip.');
 });
@@ -261,6 +348,26 @@ for (const name of ['language', 'mode']) els[name].addEventListener('change', ()
   if (['generated', 'external'].includes(source) && payload?.transcript?.segments) { applyGeneratedMode(); return; }
   if (source === 'fixture') loadDemoCues().catch(error => message(error.message));
   else message('Using selected caption JSON. Change the JSON or re-transcribe to change caption language or wording.');
+});
+els['transcript-size'].addEventListener('change', () => { els.transcript.dataset.size = els['transcript-size'].value; });
+els['show-times'].addEventListener('change', () => els.transcript.classList.toggle('hide-times', !els['show-times'].checked));
+els['transcript-search'].addEventListener('input', applySearch);
+els['transcript-search'].addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    goToMatch(event.shiftKey ? -1 : 1);
+  }
+});
+els['search-next'].addEventListener('click', () => goToMatch(1));
+els['search-prev'].addEventListener('click', () => goToMatch(-1));
+els['download-transcript'].addEventListener('click', () => {
+  if (!cues.length) return;
+  const url = URL.createObjectURL(new Blob([transcriptText()], { type: 'text/plain' }));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `${payload?.videoId || 'captionflow'}-transcript.txt`;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 function replay() {
   const cue = replayCue(cues, els.video.currentTime);
