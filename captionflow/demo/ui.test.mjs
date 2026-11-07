@@ -60,8 +60,9 @@ test('the change-video button lets the viewer return to the upload options', () 
 });
 
 test('the CC and pace buttons expose their popups', () => {
-  assert.equal($('#cc').getAttribute('aria-controls'), 'caption-settings-root');
-  assert.equal($('#cc').getAttribute('aria-expanded'), 'false');
+  assert.equal($('#cc').getAttribute('aria-pressed'), 'true', 'CC shows whether captions are on');
+  assert.equal($('#caption-settings-button').getAttribute('aria-controls'), 'caption-settings-root');
+  assert.equal($('#caption-settings-button').getAttribute('aria-expanded'), 'false');
   assert.equal($('#pace-button').getAttribute('aria-controls'), 'pace-menu');
   assert.equal($('#pace-button').getAttribute('aria-expanded'), 'false');
   assert.equal($('#pace-button').hasAttribute('aria-haspopup'), false, 'the pace panel is a disclosure, not a menu');

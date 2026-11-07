@@ -95,7 +95,7 @@ export function shouldHideControls({ paused, menuOpen, panelOpen, focusInside, m
 }
 
 const KEY_ACTIONS = {
-  ' ': 'togglePlay', k: 'togglePlay', r: 'replay', n: 'next', c: 'openCaptions',
+  ' ': 'togglePlay', k: 'togglePlay', r: 'replay', n: 'next', c: 'toggleCaptions',
   f: 'fullscreen', m: 'mute', arrowleft: 'seekBack', arrowright: 'seekForward',
 };
 const TEXT_INPUT_TYPES = new Set(['text', 'search', 'email', 'url', 'tel', 'password', 'number', 'date', 'time', 'datetime-local', 'month', 'week']);

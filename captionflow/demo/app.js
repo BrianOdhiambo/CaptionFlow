@@ -11,7 +11,7 @@ const ids = ['video', 'video-file', 'video-link', 'load-link', 'link-form', 'emp
   'follow', 'show-times', 'transcript-size', 'download-transcript', 'transcript-search', 'search-prev', 'search-next', 'search-status',
   'target-language', 'translation-status',
   'player-bar', 'player-hint', 'play', 'time', 'seek', 'replay', 'next', 'pace-button', 'pace-text', 'pace-menu',
-  'speed-slider', 'speed-value', 'speed-down', 'speed-up', 'pause-each-caption', 'cc', 'mute', 'fullscreen',
+  'speed-slider', 'speed-value', 'speed-down', 'speed-up', 'pause-each-caption', 'cc', 'caption-settings-button', 'mute', 'fullscreen',
   'caption', 'caption-wrap', 'caption-settings-root', 'message', 'progress-overlay', 'progress-title', 'progress-detail'];
 const els = Object.fromEntries(ids.map(id => [id, byId(id)]));
 let cues = [];
@@ -749,8 +749,8 @@ const captionSettings = connectCaptionSettingsPort({
   storage: browserStorage(),
   placeholder: createPlaceholderPanel(),
   onClose() {
-    els.cc.setAttribute('aria-expanded', 'false');
-    els.cc.focus();
+    els['caption-settings-button'].setAttribute('aria-expanded', 'false');
+    els['caption-settings-button'].focus();
     const resume = wasPlayingBeforePanel;
     wasPlayingBeforePanel = false;
     if (resume) els.video.play().catch(error => message(`Unable to resume playback: ${error.message}`));
@@ -767,7 +767,7 @@ function openCaptionSettings() {
   wasPlayingBeforePanel = !els.video.paused;
   if (wasPlayingBeforePanel) els.video.pause();
   captionSettings.openPanel();
-  els.cc.setAttribute('aria-expanded', 'true');
+  els['caption-settings-button'].setAttribute('aria-expanded', 'true');
   const mount = els['caption-settings-root'];
   const first = mount.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
   if (first) first.focus();
@@ -776,10 +776,27 @@ function openCaptionSettings() {
 }
 
 
+const CAPTIONS_VISIBLE_KEY = 'captionflow.captionsVisible';
+let captionsVisible = true;
+function setCaptionsOn(visible) {
+  captionsVisible = visible;
+  captionSettings.setCaptionsVisible(visible);
+  els.cc.setAttribute('aria-pressed', String(visible));
+  els.cc.setAttribute('aria-label', visible ? 'Captions on' : 'Captions off');
+  els.cc.title = visible ? 'Turn captions off (C)' : 'Turn captions on (C)';
+  try { browserStorage()?.setItem(CAPTIONS_VISIBLE_KEY, String(visible)); } catch { /* keep in memory */ }
+}
+function toggleCaptions() {
+  setCaptionsOn(!captionsVisible);
+  message(captionsVisible ? 'Captions on.' : 'Captions off.');
+  noteActivity();
+}
+
 const shortcutActions = {
   togglePlay,
   replay: () => { if (!els.replay.disabled) replay(); },
   next: () => { if (!els.next.disabled) next(); },
+  toggleCaptions,
   openCaptions: openCaptionSettings,
   closeCaptions: () => captionSettings.cancelAndClose(),
   fullscreen: toggleFullscreen,
@@ -808,7 +825,8 @@ els.video.addEventListener('click', () => {
   togglePlay();
 });
 els.play.addEventListener('click', togglePlay);
-els.cc.addEventListener('click', openCaptionSettings);
+els.cc.addEventListener('click', toggleCaptions);
+els['caption-settings-button'].addEventListener('click', openCaptionSettings);
 els.mute.addEventListener('click', toggleMute);
 els.fullscreen.addEventListener('click', toggleFullscreen);
 els.fullscreen.hidden = !document.fullscreenEnabled;
@@ -851,6 +869,7 @@ try {
   textAIAvailable = Boolean(providers.textAI);
   selectedProvider = providers.defaultProvider === 'local' ? 'local' : 'hosted';
   captionSettings.loadSavedStyle({ fontScale: prefs.fontScale });
+  setCaptionsOn(browserStorage()?.getItem(CAPTIONS_VISIBLE_KEY) !== 'false');
   applyPace();
   message('');
 } catch (error) { message(`Setup failed: ${error.message}`); }
