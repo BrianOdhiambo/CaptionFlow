@@ -225,6 +225,29 @@ video {
     cursor: none
 }
 
+/* Between the phone layout and a full desktop window, the bar's button text
+ * no longer fits one row; without this, the right-hand buttons (CC, Mute,
+ * Full screen) overflow #video-shell's `overflow: hidden` and become
+ * invisible and unclickable. Names stay for screen readers via aria-label. */
+@media (max-width: 899px) {
+    .bar-text {
+        display: none
+    }
+
+    .bar-btn {
+        padding: 6px
+    }
+
+    .bar-group {
+        gap: 0
+    }
+
+    .player-bar {
+        gap: 4px 6px;
+        padding: 16px 6px 6px
+    }
+}
+
 .player-hint {
     grid-area: hint;
     justify-self: center;
