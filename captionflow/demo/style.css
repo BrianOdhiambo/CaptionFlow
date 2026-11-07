@@ -345,7 +345,7 @@ video {
     width: 100%;
     min-height: 44px;
     margin: 0;
-    accent-color: #df8f2a;
+    accent-color: #22c55e;
     cursor: pointer
 }
 
@@ -454,7 +454,7 @@ video {
 }
 
 .caption-settings-root:focus-visible {
-    outline: 3px solid #facc15;
+    outline: 3px solid #22c55e;
     outline-offset: 2px
 }
 
@@ -674,7 +674,7 @@ video {
 .caption-settings-panel button:focus-visible,
 .caption-settings-panel select:focus-visible,
 .caption-settings-panel input:focus-visible {
-    outline: 3px solid #facc15;
+    outline: 3px solid #22c55e;
     outline-offset: 2px
 }
 
