@@ -378,19 +378,20 @@ video {
     display: none
 }
 
-/* Reading pace panel: a direct child of #video-shell like the CC panel, so it
- * stays inside the player (and full screen) and scrolls on a short player. */
+.pace-wrap {
+    position: relative
+}
+
 .pace-menu {
     position: absolute;
-    right: 12px;
-    bottom: calc(var(--bar-height, 64px) + 8px);
+    right: 0;
+    bottom: calc(100% + 6px);
     z-index: 4;
-    width: min(340px, calc(100% - 24px));
-    max-height: calc(100% - var(--bar-height, 64px) - 20px);
-    overflow: auto;
-    padding: 12px;
+    min-width: 230px;
+    margin: 0;
+    padding: 6px;
+    list-style: none;
     background: white;
-    color: #13263a;
     border-radius: 10px;
     box-shadow: 0 6px 24px rgba(0, 0, 0, .45)
 }
@@ -399,114 +400,41 @@ video {
     display: none
 }
 
-.speed-presets {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 6px;
-    margin: 0;
-    padding: 0;
-    border: 0
-}
-
-.speed-presets legend,
-.speed-custom label {
-    padding: 0;
-    margin-bottom: 6px;
-    font-weight: 700
-}
-
-.speed-presets label {
+.pace-menu button {
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: block;
+    width: 100%;
     min-height: 44px;
-    border: 1px solid #aebdc9;
-    border-radius: 8px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    cursor: pointer
+    padding: 10px 12px 10px 34px;
+    border: 0;
+    background: transparent;
+    color: #13263a;
+    text-align: left
 }
 
-.speed-presets input {
-    position: absolute;
-    inset: 0;
-    margin: 0;
-    opacity: 0;
-    cursor: pointer
-}
-
-.speed-presets label:hover {
+.pace-menu button:hover {
     background: #e6f1f8
 }
 
-.speed-presets label:has(:checked) {
-    background: #136b9f;
-    border-color: #136b9f;
-    color: white
+.pace-menu button[aria-checked=true]::before {
+    content: "✓";
+    position: absolute;
+    left: 12px
 }
 
-.speed-presets label:has(:focus-visible) {
-    outline: 3px solid #df8f2a;
-    outline-offset: 2px
-}
+/* On a small player the Pace button can wrap to the left of the bar, and the
+ * wrapped bar leaves no room above it, so a menu anchored above the button
+ * would run off the player. Overlay it on the bar's bottom-right corner
+ * instead (.player-bar is the nearest positioned ancestor). */
+@container player-shell (max-width: 480px) {
+    .pace-wrap {
+        position: static
+    }
 
-.speed-custom {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas:
-        "label label value"
-        "down slider up";
-    align-items: center;
-    gap: 0 8px;
-    margin-top: 14px
-}
-
-.speed-custom label {
-    grid-area: label;
-    margin: 0
-}
-
-.speed-custom output {
-    grid-area: value;
-    justify-self: end;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums
-}
-
-#speed-down {
-    grid-area: down
-}
-
-#speed-up {
-    grid-area: up
-}
-
-#speed-slider {
-    grid-area: slider;
-    width: 100%;
-    min-height: 44px;
-    margin: 0;
-    accent-color: #136b9f
-}
-
-.speed-step {
-    min-width: 44px;
-    min-height: 44px;
-    padding: 0;
-    font-size: 1.3rem;
-    line-height: 1
-}
-
-.pause-toggle {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 44px;
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid #e7eef3;
-    font-weight: 600
+    .pace-menu {
+        right: 8px;
+        bottom: 8px
+    }
 }
 
 /* Caption settings panel, opened from the CC button. It sits beside the video, level with its top,
@@ -1194,7 +1122,7 @@ button:disabled {
     }
 
     .watch-layout:not(.transcript-hidden) .transcript-panel {
-        contain: size
+        overflow-y: auto
     }
 
     .watch-layout:not(.transcript-hidden) .transcript {
@@ -1222,3 +1150,110 @@ button:disabled {
 .summary-points { padding-left: 22px; line-height: 1.5; }
 .summary-points li { margin-bottom: 8px; }
 
+
+/* Simplified page: one player card, with an empty state until a video is loaded. */
+.site-header {
+    background: #10283d;
+    color: #fff;
+    padding: 18px 24px
+}
+
+.site-header h1 {
+    margin: 0;
+    font-size: 1.5rem
+}
+
+.page {
+    max-width: 960px;
+    margin: 24px auto;
+    padding: 0 16px
+}
+
+.video-shell.no-video .player-bar,
+.video-shell.no-video .caption-wrap,
+.video-shell.no-video .pace-menu {
+    display: none
+}
+
+.empty-state {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 24px;
+    text-align: center;
+    color: #e5eef5;
+    background: #0b0f14
+}
+
+.empty-state[hidden] {
+    display: none
+}
+
+.empty-title {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 700
+}
+
+.empty-text {
+    margin: 0;
+    color: #aebdc9
+}
+
+.btn {
+    min-height: 44px;
+    padding: 10px 18px;
+    border: 1px solid #7eb79c;
+    border-radius: 10px;
+    background: #e6f1f8;
+    color: #13263a;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center
+}
+
+.btn-primary {
+    background: #22c55e;
+    border-color: #22c55e;
+    color: #052e16
+}
+
+.link-form {
+    width: min(520px, 100%);
+    display: grid;
+    gap: 8px;
+    text-align: left
+}
+
+.link-form label {
+    font-size: .9rem;
+    color: #e5eef5
+}
+
+.link-row {
+    display: flex;
+    gap: 8px
+}
+
+.link-row input {
+    flex: 1;
+    min-height: 44px;
+    padding: 8px 10px;
+    border: 1px solid #374151;
+    border-radius: 10px;
+    background: #1f2937;
+    color: #f1f5f9
+}
+
+.message {
+    margin: 12px 0 0;
+    color: #264d65;
+    font-weight: 600
+}

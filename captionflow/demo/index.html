@@ -3,209 +3,96 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>CaptionFlow | Accessible caption player</title>
+    <title>CaptionFlow</title>
     <link rel="stylesheet" href="/style.css" />
     <script type="module" src="/app.js"></script>
   </head>
   <body>
-    <header class="header">
-      <div>
-        <p class="eyebrow">AI for Accessibility Hackathon</p>
-        <h1>CaptionFlow</h1>
-        <p>Captions you can follow, at your pace.</p>
-      </div>
+    <header class="site-header">
+      <h1>CaptionFlow</h1>
     </header>
-    <main>
-      <!-- <section class="notice" aria-label="Prototype limitations">
-        <strong>Before testing:</strong> Fixture captions are fictional and do
-        not match an arbitrary video. Local ASR generates captions from the
-        exact video selected below, but the wording and timings still require
-        review. Experimental plain English wording suggestions are available,
-        but <strong>all changed captions need human review</strong>. This is not
-        full AI simplification; automatic English/Swahili translation is not yet
-        available. -->
-      </section>
-      <section class="panel controls" aria-labelledby="setup-title">
-        <h2 id="setup-title">1. Choose your video and captions</h2>
-        <label class="upload-field"
-          >Video from your device
-          <input
-            id="video-file"
-            type="file"
-            accept="video/mp4,video/webm,video/ogg,video/quicktime"
-        /></label>
-        <p id="caption-status" class="caption-status" role="status" aria-live="polite">
-          Choose a video, then generate captions for it.
-        </p>
-        <div class="actions">
-          <button id="generate" type="button" disabled>Generate captions from this video</button>
-        </div>
-      </section>
-      <section class="panel" aria-labelledby="view-title">
-        <h2 id="view-title">2. Watch and read</h2>
-        <div class="watch-layout" id="watch-layout">
-          <div class="watch-main">
-            <div class="video-shell controls-visible" id="video-shell">
-              <video
-                id="video"
-                playsinline
-                preload="metadata"
-                tabindex="0"
-                aria-label="Video with CaptionFlow captions"
-              ></video>
-              <div class="caption-wrap contrast-normal" id="caption-wrap">
-                <div id="caption" aria-live="off">Choose a video to begin.</div>
+    <main class="page">
+      <section class="player-card" aria-label="Video player">
+        <div class="video-shell no-video controls-visible" id="video-shell">
+          <video id="video" playsinline preload="metadata" tabindex="0" aria-label="Video with captions"></video>
+          <div class="empty-state" id="empty-state">
+            <p class="empty-title">No video yet</p>
+            <p class="empty-text">Upload a video from your device, or paste a link to one.</p>
+            <label class="btn btn-primary" for="video-file">Upload video</label>
+            <input id="video-file" type="file" accept="video/mp4,video/webm,video/ogg,video/quicktime" hidden />
+            <form class="link-form" id="link-form">
+              <label for="video-link">Or paste a video link</label>
+              <div class="link-row">
+                <input id="video-link" type="url" inputmode="url" placeholder="https://example.com/video.mp4" autocomplete="off" />
+                <button id="load-link" class="btn" type="submit">Load link</button>
               </div>
-              <div id="caption-settings-root" class="caption-settings-root" hidden></div>
-              <div id="pace-menu" class="pace-menu" role="group" aria-label="Reading pace" hidden>
-                <fieldset class="speed-presets">
-                  <legend>Speed</legend>
-                  <label><input type="radio" name="speed" value="0.25" /> 0.25×</label>
-                  <label><input type="radio" name="speed" value="0.5" /> 0.5×</label>
-                  <label><input type="radio" name="speed" value="0.75" /> 0.75×</label>
-                  <label><input type="radio" name="speed" value="0.9" /> 0.9×</label>
-                  <label><input type="radio" name="speed" value="1" checked /> Normal</label>
-                  <label><input type="radio" name="speed" value="1.25" /> 1.25×</label>
-                  <label><input type="radio" name="speed" value="1.5" /> 1.5×</label>
-                  <label><input type="radio" name="speed" value="1.75" /> 1.75×</label>
-                  <label><input type="radio" name="speed" value="2" /> 2×</label>
-                </fieldset>
-                <div class="speed-custom">
-                  <label for="speed-slider">Custom speed</label>
-                  <output id="speed-value" for="speed-slider">1×</output>
-                  <button id="speed-down" class="speed-step" type="button" aria-label="Slower" title="Slower (Shift + &lt;)">−</button>
-                  <input id="speed-slider" type="range" min="0.25" max="2" step="0.05" value="1" aria-valuetext="Normal speed" />
-                  <button id="speed-up" class="speed-step" type="button" aria-label="Faster" title="Faster (Shift + &gt;)">+</button>
-                </div>
-                <label class="pause-toggle"><input type="checkbox" id="pause-each-caption" /> Pause at each caption</label>
-              </div>
-              <div class="player-bar" id="player-bar" role="group" aria-label="Video controls">
-                <p id="player-hint" class="player-hint" hidden>
-                  Paused so you can read. Press Play or Next.
-                </p>
-                <input id="seek" class="bar-seek" type="range" min="0" max="0" step="0.1" value="0" aria-label="Seek" aria-valuetext="0:00 of 0:00" title="Seek (Left and Right arrows: 5 seconds)" />
-                <div class="bar-buttons">
-                  <div class="bar-group bar-left">
-                    <button id="play" class="bar-btn" type="button" data-state="paused" aria-label="Play" title="Play (Space or K)">
-                      <svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z"/></svg><svg class="icon icon-pause" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
-                    </button>
-                    <button id="replay" class="bar-btn bar-btn-essential" type="button" aria-label="Replay sentence" title="Replay sentence (R)">
-                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg><span class="bar-text">Replay sentence</span>
-                    </button>
-                    <button id="next" class="bar-btn bar-btn-essential" type="button" aria-label="Next caption" title="Next caption (N)">
-                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l8.5 6L6 18zM16 6h2v12h-2z"/></svg><span class="bar-text">Next caption</span>
-                    </button>
-                    <span id="time" class="bar-time">0:00 / 0:00</span>
-                  </div>
-                  <div class="bar-group bar-right">
-                    <button id="transcript-toggle" class="bar-btn" type="button" aria-pressed="true" aria-controls="transcript-panel" aria-label="Transcript" title="Hide transcript">
-                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 5h2v2H3zm4 0h14v2H7zM3 11h2v2H3zm4 0h14v2H7zM3 17h2v2H3zm4 0h14v2H7z"/></svg>
-                    </button>
-                    <button id="pace-button" class="bar-btn" type="button" aria-expanded="false" aria-controls="pace-menu" aria-label="Reading pace: normal speed" title="Reading pace (Shift + &lt; or &gt; to change speed)">
-                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4a9 9 0 0 0-7.4 14.1l1.6-1.2A7 7 0 1 1 19 13a7 7 0 0 1-1.2 3.9l1.6 1.2A9 9 0 0 0 12 4zm4.6 4.2-5.7 4.3a1.6 1.6 0 1 0 2.3 2.2z"/></svg><span class="bar-text" id="pace-text">Pace: Normal</span>
-                    </button>
-                    <button id="cc" class="bar-btn" type="button" aria-expanded="false" aria-controls="caption-settings-root" aria-label="CC: caption settings" title="Caption settings (C)">
-                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2" y="5" width="20" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10.5 10.2a2.5 2.5 0 1 0 0 3.6M17.5 10.2a2.5 2.5 0 1 0 0 3.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                    </button>
-                    <button id="mute" class="bar-btn" type="button" data-state="unmuted" aria-label="Mute" title="Mute (M)">
-                      <svg class="icon icon-unmuted" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><svg class="icon icon-muted" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="m16 9.5 5 5m0-5-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                    </button>
-                    <button id="fullscreen" class="bar-btn" type="button" data-state="off" aria-label="Full screen" title="Full screen (F)">
-                      <svg class="icon icon-fs-enter" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9V4h5v2H6v3zm11-5h5v5h-2V6h-3zM4 15h2v3h3v2H4zm14 0h2v5h-5v-2h3z"/></svg><svg class="icon icon-fs-exit" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 4v5H4V7h3V4zm6 0h2v3h3v2h-5zM4 15h5v5H7v-3H4zm11 0h5v2h-3v3h-2z"/></svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <p class="small" id="time-status">No video loaded.</p>
-            <p role="status" aria-live="polite" id="message" class="message">
-              Choose a video, then generate matching captions.
-            </p>
+            </form>
           </div>
-          <section class="transcript-panel" id="transcript-panel" aria-labelledby="transcript-title">
-            <div class="transcript-header">
-              <h3 id="transcript-title">Transcript</h3>
-              <div class="transcript-options-wrap">
-                <button id="transcript-options-button" class="icon-btn" type="button" aria-expanded="false" aria-controls="transcript-options" aria-label="Transcript options" title="Transcript options">
-                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
-                </button>
-                <div id="transcript-options" class="transcript-options" role="group" aria-label="Transcript options" hidden>
-                  <label
-                    ><input type="checkbox" id="follow" checked /> Follow playback</label
-                  >
-                  <label
-                    ><input type="checkbox" id="show-times" checked /> Show times</label
-                  >
-                  <label class="option-select"
-                    >Text size
-                    <select id="transcript-size">
-                      <option value="normal">Normal</option>
-                      <option value="large">Large</option>
-                      <option value="xlarge">Extra large</option>
-                    </select></label
-                  >
-                  <button id="download-transcript" type="button" disabled>
-                    Save transcript (.txt)
-                  </button>
-                  <button id="summarise-transcript" type="button" disabled>
-                    Summarise transcript
-                  </button>
+          <div class="caption-wrap contrast-normal" id="caption-wrap">
+            <div id="caption" aria-live="off"></div>
+          </div>
+          <div id="caption-settings-root" class="caption-settings-root" hidden></div>
+                <div id="pace-menu" class="pace-menu" role="group" aria-label="Reading pace" hidden>
+                  <fieldset class="speed-presets">
+                    <legend>Speed</legend>
+                    <label><input type="radio" name="speed" value="0.25" /> 0.25×</label>
+                    <label><input type="radio" name="speed" value="0.5" /> 0.5×</label>
+                    <label><input type="radio" name="speed" value="0.75" /> 0.75×</label>
+                    <label><input type="radio" name="speed" value="0.9" /> 0.9×</label>
+                    <label><input type="radio" name="speed" value="1" checked /> Normal</label>
+                    <label><input type="radio" name="speed" value="1.25" /> 1.25×</label>
+                    <label><input type="radio" name="speed" value="1.5" /> 1.5×</label>
+                    <label><input type="radio" name="speed" value="1.75" /> 1.75×</label>
+                    <label><input type="radio" name="speed" value="2" /> 2×</label>
+                  </fieldset>
+                  <div class="speed-custom">
+                    <label for="speed-slider">Custom speed</label>
+                    <output id="speed-value" for="speed-slider">1×</output>
+                    <button id="speed-down" class="speed-step" type="button" aria-label="Slower" title="Slower (Shift + &lt;)">−</button>
+                    <input id="speed-slider" type="range" min="0.25" max="2" step="0.05" value="1" aria-valuetext="Normal speed" />
+                    <button id="speed-up" class="speed-step" type="button" aria-label="Faster" title="Faster (Shift + &gt;)">+</button>
+                  </div>
+                  <label class="pause-toggle"><input type="checkbox" id="pause-each-caption" /> Pause at each caption</label>
                 </div>
-              </div>
-            </div>
-            <div class="transcript-search" role="search">
-              <label for="transcript-search" class="visually-hidden"
-                >Search this transcript</label
-              >
-              <div class="search-row">
-                <input
-                  id="transcript-search"
-                  type="search"
-                  autocomplete="off"
-                  placeholder="Search transcript"
-                />
-                <button id="search-prev" class="icon-btn" type="button" aria-label="Previous match" title="Previous match" disabled>
-                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m7.4 15.4 4.6-4.6 4.6 4.6L18 14l-6-6-6 6z"/></svg>
-                </button>
-                <button id="search-next" class="icon-btn" type="button" aria-label="Next match" title="Next match" disabled>
-                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z"/></svg>
-                </button>
-              </div>
-              <p id="search-status" class="small search-status" role="status" aria-live="polite"></p>
-            </div>
-            <details class="text-ai-options" id="text-ai-options">
-              <summary>Caption language and AI tools</summary>
-              <label for="target-language">Caption display language</label>
-              <select id="target-language" aria-describedby="translation-status">
-                <option value="">Original spoken language</option>
-                <option value="en">English</option>
-                <option value="sw">Kiswahili</option>
-              </select>
-              <label class="consent" for="text-ai-consent">
-                <input id="text-ai-consent" type="checkbox" />
-                I consent to sending the transcript text (not the video) to the configured AI service for translation or key points.
-              </label>
-              <button id="translate" type="button" disabled>Translate captions with AI</button>
-              <p id="translation-status" class="small" role="status" aria-live="polite">Select English or Kiswahili after loading captions.</p>
-              <p class="small">AI translations are unreviewed. Original speech and timestamps remain available.</p>
-            </details>
-            <ol id="transcript" class="transcript"></ol>
-            <section class="transcript-summary" aria-labelledby="summary-title">
-              <h4 id="summary-title">Key points from transcript</h4>
-              <button id="summarize" type="button" disabled>Summarize transcript into key points</button>
-              <p id="summary-status" class="small" role="status" aria-live="polite">AI key points will appear here after you request them.</p>
-              <ul id="summary-points" class="summary-points"></ul>
-            </section>
-            <p class="small transcript-note">Select a line to jump to that moment. Unreviewed wording is marked.</p>
-          </section>
+                <div class="player-bar" id="player-bar" role="group" aria-label="Video controls">
+                  <p id="player-hint" class="player-hint" hidden>
+                    Paused so you can read. Press Play or Next.
+                  </p>
+                  <input id="seek" class="bar-seek" type="range" min="0" max="0" step="0.1" value="0" aria-label="Seek" aria-valuetext="0:00 of 0:00" title="Seek (Left and Right arrows: 5 seconds)" />
+                  <div class="bar-buttons">
+                    <div class="bar-group bar-left">
+                      <button id="change-video" class="bar-btn" type="button" aria-label="Change video" title="Change video">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 20h14v-2H5v2zM12 3l-5 5h3v6h4V8h3z"/></svg>
+                      </button>
+                      <button id="play" class="bar-btn" type="button" data-state="paused" aria-label="Play" title="Play (Space or K)">
+                        <svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z"/></svg><svg class="icon icon-pause" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+                      </button>
+                      <button id="replay" class="bar-btn bar-btn-essential" type="button" aria-label="Replay this caption" title="Replay this caption (R)">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg><span class="bar-text">Replay this caption</span>
+                      </button>
+                      <button id="next" class="bar-btn bar-btn-essential" type="button" aria-label="Next caption" title="Next caption (N)">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l8.5 6L6 18zM16 6h2v12h-2z"/></svg><span class="bar-text">Next caption</span>
+                      </button>
+                      <span id="time" class="bar-time">0:00 / 0:00</span>
+                    </div>
+                    <div class="bar-group bar-right">
+                      <button id="pace-button" class="bar-btn" type="button" aria-expanded="false" aria-controls="pace-menu" aria-label="Reading pace: normal speed" title="Reading pace (Shift + &lt; or &gt; to change speed)">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4a9 9 0 0 0-7.4 14.1l1.6-1.2A7 7 0 1 1 19 13a7 7 0 0 1-1.2 3.9l1.6 1.2A9 9 0 0 0 12 4zm4.6 4.2-5.7 4.3a1.6 1.6 0 1 0 2.3 2.2z"/></svg><span class="bar-text" id="pace-text">Pace: Normal</span>
+                      </button>
+                      <button id="cc" class="bar-btn" type="button" aria-expanded="false" aria-controls="caption-settings-root" aria-label="CC: caption settings" title="Caption settings (C)">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2" y="5" width="20" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10.5 10.2a2.5 2.5 0 1 0 0 3.6M17.5 10.2a2.5 2.5 0 1 0 0 3.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                      </button>
+                      <button id="mute" class="bar-btn" type="button" data-state="unmuted" aria-label="Mute" title="Mute (M)">
+                        <svg class="icon icon-unmuted" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><svg class="icon icon-muted" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="m16 9.5 5 5m0-5-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                      </button>
+                      <button id="fullscreen" class="bar-btn" type="button" data-state="off" aria-label="Full screen" title="Full screen (F)">
+                        <svg class="icon icon-fs-enter" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9V4h5v2H6v3zm11-5h5v5h-2V6h-3zM4 15h2v3h3v2H4zm14 0h2v5h-5v-2h3z"/></svg><svg class="icon icon-fs-exit" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 4v5H4V7h3V4zm6 0h2v3h3v2h-5zM4 15h5v5H7v-3H4zm11 0h5v2h-3v3h-2z"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
         </div>
-      </section>
-      <section class="panel" aria-labelledby="prefs-title">
-        <h2 id="prefs-title">3. Make captions comfortable</h2>
-        <p class="small">
-          Caption settings are in the player: press the CC button (or the C
-          key) to change how captions look.
-        </p>
+        <p id="message" class="message" role="status" aria-live="polite">Upload a video, or paste a link to one.</p>
       </section>
     </main>
   </body>

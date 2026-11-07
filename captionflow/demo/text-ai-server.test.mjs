@@ -50,7 +50,7 @@ test('translation and summary routes require consent and never retranscribe or u
   assert.equal(translated,1);assert.equal(summarized,1);
   assert.equal((await fetch(`${base}/caption-view.mjs`)).status,200);
   const html=await (await fetch(base)).text();
-  assert.match(html,/Translate captions with AI/);assert.match(html,/Summarize transcript/);
+  assert.doesNotMatch(html,/Translate captions with AI/);
  });
 });
 

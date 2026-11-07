@@ -20,6 +20,7 @@ import { createConfiguredHostedTranscriber, resolveHostedApiKey, isGeminiGateway
 import { createGeminiTextService } from '../src/providers/gemini-text.mjs';
 import { createToolkitPreferenceProvider } from '../src/toolkit-preferences.mjs';
 import { loadCaptionFlowEnv } from '../src/runtime-config.mjs';
+import { fetchVideoLink, LinkError } from '../src/link-fetch.mjs';
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const staticFiles = {
@@ -185,6 +186,18 @@ export async function createCaptionFlowDemoServer({
           busy = false;
         }
         send(res, 200, { ...result, provider });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/fetch-link') {
+        const body = await parseJson(req);
+        try {
+          const fetched = await fetchVideoLink(body?.url, { maxBytes: maxMediaBytes });
+          res.writeHead(200, { 'Content-Type': fetched.contentType, 'Content-Length': fetched.bytes.length, 'Cache-Control': 'no-store' });
+          res.end(fetched.bytes);
+        } catch (error) {
+          if (error instanceof LinkError) throw new HttpError(error.status, error.message);
+          throw error;
+        }
         return;
       }
       if (req.method === 'POST' && (url.pathname === '/api/translate' || url.pathname === '/api/summarize')) {

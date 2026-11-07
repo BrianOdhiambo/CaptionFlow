@@ -89,7 +89,7 @@ export function paceSummary({ speed = 1, pauseEachCaption = false } = {}) {
   };
 }
 
-/** True only when playing, nothing is open, focus is outside the bar, and the viewer is idle. */
+/** True only when playing, nothing is open, focus is outside the bar, and the viewer is idle. *//** True only when playing, nothing is open, focus is outside the bar, and the viewer is idle. */
 export function shouldHideControls({ paused, menuOpen, panelOpen, focusInside, msSinceActivity }) {
   return !paused && !menuOpen && !panelOpen && !focusInside && msSinceActivity >= HIDE_CONTROLS_AFTER_MS;
 }
@@ -97,7 +97,6 @@ export function shouldHideControls({ paused, menuOpen, panelOpen, focusInside, m
 const KEY_ACTIONS = {
   ' ': 'togglePlay', k: 'togglePlay', r: 'replay', n: 'next', c: 'openCaptions',
   f: 'fullscreen', m: 'mute', arrowleft: 'seekBack', arrowright: 'seekForward',
-  '>': 'speedUp', '<': 'speedDown',
 };
 const TEXT_INPUT_TYPES = new Set(['text', 'search', 'email', 'url', 'tel', 'password', 'number', 'date', 'time', 'datetime-local', 'month', 'week']);
 
