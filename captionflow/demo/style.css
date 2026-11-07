@@ -1346,3 +1346,30 @@ button:disabled {
     color: #94a3b8;
     font-size: .72rem
 }
+
+/* The transcript scrolls on its own: the panel stays beside the video and the list inside it scrolls,
+ * so the mouse wheel over the transcript does not move the page. */
+@media (min-width: 900px) {
+    .watch-layout:not(.transcript-hidden) {
+        align-items: start
+    }
+
+    .watch-layout:not(.transcript-hidden) .transcript-panel {
+        position: sticky;
+        top: 16px;
+        max-height: calc(100vh - 32px);
+        overflow: hidden
+    }
+
+    .watch-layout:not(.transcript-hidden) .transcript {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: none;
+        overflow-y: auto;
+        overscroll-behavior: contain
+    }
+}
+
+.watch-layout .transcript {
+    overscroll-behavior: contain
+}
