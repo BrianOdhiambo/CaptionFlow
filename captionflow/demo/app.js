@@ -105,12 +105,6 @@ function renderTranscript() {
     text.className = 'line-text';
     text.textContent = cue.displayText;
     button.append(timestamp, ' ', text);
-    if (cue.status && cue.status !== 'ready') {
-      const flag = document.createElement('span');
-      flag.className = 'flag';
-      flag.textContent = cue.status === 'needs-review' ? ' Unreviewed wording' : ' Original fallback';
-      button.append(' ', flag);
-    }
     button.addEventListener('click', () => {
       els.video.currentTime = cue.start;
       sync();
