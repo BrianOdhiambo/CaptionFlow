@@ -1152,16 +1152,6 @@ button:disabled {
 
 
 /* Simplified page: one player card, with an empty state until a video is loaded. */
-.site-header {
-    background: #10283d;
-    color: #fff;
-    padding: 18px 24px
-}
-
-.site-header h1 {
-    margin: 0;
-    font-size: 1.5rem
-}
 
 .page {
     max-width: 1280px;
@@ -1321,4 +1311,38 @@ button:disabled {
     .spinner {
         animation: none
     }
+}
+
+/* Branding under the video, as in the design: logo, name, divider and tagline. */
+.brand-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: #0b0f14;
+    color: #f1f5f9
+}
+
+.brand-logo {
+    width: 24px;
+    height: 24px;
+    fill: #22c55e
+}
+
+.brand-name {
+    font-size: 1.05rem;
+    font-weight: 800
+}
+
+.brand-divider {
+    width: 1px;
+    height: 18px;
+    background: #374151
+}
+
+.brand-tagline {
+    color: #cbd5e1;
+    font-size: .9rem
 }
