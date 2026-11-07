@@ -70,7 +70,7 @@ test('the CC and pace buttons expose their popups', () => {
 
 test('the pace panel offers speed presets, a custom slider and a separate pause toggle', () => {
   const panel = $('#pace-menu');
-  assert.equal(panel.parentElement, $('#video-shell'));
+  assert.equal(panel.parentElement, $('#pace-wrap'), 'the speed menu opens from its button');
   assert.equal(panel.hidden, true);
   const presets = [...panel.querySelectorAll('input[type=radio][name=speed]')].map(radio => Number(radio.value));
   assert.deepEqual(presets, [...SPEED_PRESETS]);

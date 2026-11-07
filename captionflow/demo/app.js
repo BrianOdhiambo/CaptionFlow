@@ -10,8 +10,8 @@ const ids = ['video', 'video-file', 'video-link', 'load-link', 'link-form', 'emp
   'watch-layout', 'transcript-panel', 'transcript', 'transcript-toggle', 'transcript-options-button', 'transcript-options',
   'follow', 'show-times', 'transcript-size', 'download-transcript', 'transcript-search', 'search-prev', 'search-next', 'search-status',
   'target-language', 'translation-status',
-  'player-bar', 'player-hint', 'play', 'time', 'seek', 'replay', 'next', 'pace-button', 'pace-text', 'pace-menu',
-  'speed-slider', 'speed-value', 'speed-down', 'speed-up', 'pause-each-caption', 'cc', 'caption-settings-button', 'mute', 'fullscreen',
+  'player-bar', 'player-hint', 'play', 'time', 'seek', 'replay', 'next', 'pace-wrap', 'pace-button', 'pace-text', 'pace-menu',
+  'speed-slider', 'speed-value', 'speed-down', 'speed-up', 'pause-each-caption', 'cc', 'caption-settings-button', 'language-wrap', 'language-button', 'language-menu', 'mute', 'fullscreen',
   'caption', 'caption-wrap', 'caption-settings-root', 'message', 'progress-overlay', 'progress-title', 'progress-detail'];
 const els = Object.fromEntries(ids.map(id => [id, byId(id)]));
 let cues = [];
@@ -105,12 +105,6 @@ function renderTranscript() {
     text.className = 'line-text';
     text.textContent = cue.displayText;
     button.append(timestamp, ' ', text);
-    if (cue.status && cue.status !== 'ready') {
-      const flag = document.createElement('span');
-      flag.className = 'flag';
-      flag.textContent = cue.status === 'needs-review' ? ' Unreviewed wording' : ' Original fallback';
-      button.append(' ', flag);
-    }
     button.addEventListener('click', () => {
       els.video.currentTime = cue.start;
       sync();
@@ -226,6 +220,7 @@ function displayLanguage() {
 
 function updateTextActions() {
   els['target-language'].disabled = !payload?.transcript?.segments?.length || isTranslating;
+  if (els['language-button']) els['language-button'].disabled = els['target-language'].disabled;
 }
 
 function clearTranscript() {
@@ -405,6 +400,7 @@ function sendForCaptions(file, params, onUploaded, onUploading) {
 
 async function loadVideo(file) {
   const version = ++videoSelectionVersion;
+  setCaptionsOn(true);
   if (objectUrl) URL.revokeObjectURL(objectUrl);
   objectUrl = URL.createObjectURL(file);
   els.video.src = objectUrl;
@@ -508,7 +504,57 @@ els['video-file'].addEventListener('change', () => {
   if (file) loadVideo(file);
 });
 els['link-form'].addEventListener('submit', loadLink);
-els['target-language'].addEventListener('change', translateSelected);
+els['target-language'].addEventListener('change', () => { translateSelected(); showLanguageButton(); });
+const LANGUAGE_OPTIONS = [
+  { value: '', label: 'Original spoken language', short: 'Original' },
+  { value: 'en', label: 'English', short: 'English' },
+  { value: 'sw', label: 'Kiswahili', short: 'Kiswahili' },
+];
+const languageItems = [...els['language-menu'].querySelectorAll('[data-language]')];
+function showLanguageButton() {
+  const value = els['target-language'].value;
+  const option = LANGUAGE_OPTIONS.find(item => item.value === value) ?? LANGUAGE_OPTIONS[0];
+  els['language-button'].textContent = option.short;
+  els['language-button'].setAttribute('aria-label', `Caption language: ${option.label}`);
+  els['language-button'].disabled = els['target-language'].disabled;
+  for (const item of languageItems) item.setAttribute('aria-checked', String(item.dataset.language === value));
+}
+function openLanguageMenu() {
+  if (els['language-button'].disabled) return;
+  closePaceMenu();
+  els['language-menu'].hidden = false;
+  els['language-button'].setAttribute('aria-expanded', 'true');
+  (languageItems.find(item => item.getAttribute('aria-checked') === 'true') ?? languageItems[0]).focus();
+  noteActivity();
+}
+function closeLanguageMenu({ focusButton = false } = {}) {
+  if (els['language-menu'].hidden) return;
+  els['language-menu'].hidden = true;
+  els['language-button'].setAttribute('aria-expanded', 'false');
+  if (focusButton) els['language-button'].focus();
+}
+els['language-button'].addEventListener('click', () => {
+  if (els['language-menu'].hidden) openLanguageMenu(); else closeLanguageMenu();
+});
+for (const item of languageItems) item.addEventListener('click', () => {
+  els['target-language'].value = item.dataset.language;
+  els['target-language'].dispatchEvent(new Event('change'));
+  closeLanguageMenu({ focusButton: true });
+});
+els['language-menu'].addEventListener('keydown', event => {
+  const index = languageItems.indexOf(document.activeElement);
+  const move = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: languageItems.length - 1 }[event.key];
+  if (move !== undefined) {
+    event.preventDefault();
+    languageItems[(move + languageItems.length) % languageItems.length].focus();
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    closeLanguageMenu({ focusButton: true });
+  } else if (event.key === 'Tab') closeLanguageMenu();
+});
+document.addEventListener('pointerdown', event => {
+  if (!els['language-menu'].hidden && !els['language-wrap'].contains(event.target)) closeLanguageMenu();
+});
 els['transcript-size'].addEventListener('change', () => { els.transcript.dataset.size = els['transcript-size'].value; });
 els['show-times'].addEventListener('change', () => els.transcript.classList.toggle('hide-times', !els['show-times'].checked));
 els['transcript-search'].addEventListener('input', applySearch);
@@ -679,6 +725,7 @@ function setSpeed(value, { announce = true } = {}) {
   if (announce) message(`Speed: ${speedLabel(speed)}.`);
 }
 function openPaceMenu() {
+  closeLanguageMenu();
   els['pace-menu'].hidden = false;
   els['pace-button'].setAttribute('aria-expanded', 'true');
   (speedRadios.find(radio => radio.checked) ?? els['speed-slider']).focus();
@@ -808,7 +855,7 @@ const shortcutActions = {
 };
 shell.addEventListener('keydown', event => {
   noteActivity();
-  if (!els['pace-menu'].hidden) return;
+  if (!els['pace-menu'].hidden || !els['language-menu'].hidden) return;
   const action = shortcutFor(event, { panelOpen: captionSettings.isOpen() });
   if (!action) return;
   event.preventDefault();

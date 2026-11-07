@@ -392,6 +392,7 @@ video {
     padding: 6px;
     list-style: none;
     background: white;
+    color: #13263a;
     border-radius: 10px;
     box-shadow: 0 6px 24px rgba(0, 0, 0, .45)
 }
@@ -427,7 +428,7 @@ video {
  * would run off the player. Overlay it on the bar's bottom-right corner
  * instead (.player-bar is the nearest positioned ancestor). */
 @container player-shell (max-width: 480px) {
-    .pace-wrap {
+    #pace-wrap {
         position: static
     }
 
@@ -1345,4 +1346,40 @@ button:disabled {
 .brand-tagline {
     color: #94a3b8;
     font-size: .72rem
+}
+
+/* The transcript scrolls on its own: the panel stays beside the video and the list inside it scrolls,
+ * so the mouse wheel over the transcript does not move the page. */
+@media (min-width: 900px) {
+    .watch-layout:not(.transcript-hidden) {
+        align-items: start
+    }
+
+    .watch-layout:not(.transcript-hidden) .transcript-panel {
+        position: sticky;
+        top: 16px;
+        max-height: calc(100vh - 32px);
+        overflow: hidden
+    }
+
+    .watch-layout:not(.transcript-hidden) .transcript {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: none;
+        overflow-y: auto;
+        overscroll-behavior: contain
+    }
+}
+
+.watch-layout .transcript {
+    overscroll-behavior: contain
+}
+
+.menu-wrap {
+    position: relative;
+    display: inline-flex
+}
+
+.language-menu {
+    min-width: 200px
 }
