@@ -406,6 +406,7 @@ function sendForCaptions(file, params, onUploaded, onUploading) {
 
 async function loadVideo(file) {
   const version = ++videoSelectionVersion;
+  setCaptionsOn(true);
   if (objectUrl) URL.revokeObjectURL(objectUrl);
   objectUrl = URL.createObjectURL(file);
   els.video.src = objectUrl;
