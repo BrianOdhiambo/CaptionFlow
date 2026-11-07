@@ -12,6 +12,7 @@
       <h1>CaptionFlow</h1>
     </header>
     <main class="page">
+      <div class="watch-layout" id="watch-layout">
       <section class="player-card" aria-label="Video player">
         <div class="video-shell no-video controls-visible" id="video-shell">
           <video id="video" playsinline preload="metadata" tabindex="0" aria-label="Video with captions"></video>
@@ -76,6 +77,9 @@
                       <span id="time" class="bar-time">0:00 / 0:00</span>
                     </div>
                     <div class="bar-group bar-right">
+                      <button id="transcript-toggle" class="bar-btn" type="button" aria-pressed="true" aria-controls="transcript-panel" aria-label="Transcript" title="Hide transcript">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 5h2v2H3zm4 0h14v2H7zM3 11h2v2H3zm4 0h14v2H7zM3 17h2v2H3zm4 0h14v2H7z"/></svg>
+                      </button>
                       <button id="pace-button" class="bar-btn" type="button" aria-expanded="false" aria-controls="pace-menu" aria-label="Reading pace: normal speed" title="Reading pace (Shift + &lt; or &gt; to change speed)">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4a9 9 0 0 0-7.4 14.1l1.6-1.2A7 7 0 1 1 19 13a7 7 0 0 1-1.2 3.9l1.6 1.2A9 9 0 0 0 12 4zm4.6 4.2-5.7 4.3a1.6 1.6 0 1 0 2.3 2.2z"/></svg><span class="bar-text" id="pace-text">Pace: Normal</span>
                       </button>
@@ -94,6 +98,66 @@
         </div>
         <p id="message" class="message" role="status" aria-live="polite">Upload a video, or paste a link to one.</p>
       </section>
+                <section class="transcript-panel" id="transcript-panel" aria-labelledby="transcript-title">
+                  <div class="transcript-header">
+                    <h3 id="transcript-title">Transcript</h3>
+                    <div class="transcript-options-wrap">
+                      <button id="transcript-options-button" class="icon-btn" type="button" aria-expanded="false" aria-controls="transcript-options" aria-label="Transcript options" title="Transcript options">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+                      </button>
+                      <div id="transcript-options" class="transcript-options" role="group" aria-label="Transcript options" hidden>
+                        <label
+                          ><input type="checkbox" id="follow" checked /> Follow playback</label
+                        >
+                        <label
+                          ><input type="checkbox" id="show-times" checked /> Show times</label
+                        >
+                        <label class="option-select"
+                          >Text size
+                          <select id="transcript-size">
+                            <option value="normal">Normal</option>
+                            <option value="large">Large</option>
+                            <option value="xlarge">Extra large</option>
+                          </select></label
+                        >
+                        <button id="download-transcript" type="button" disabled>
+                          Save transcript (.txt)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="transcript-search" role="search">
+                    <label for="transcript-search" class="visually-hidden"
+                      >Search this transcript</label
+                    >
+                    <div class="search-row">
+                      <input
+                        id="transcript-search"
+                        type="search"
+                        autocomplete="off"
+                        placeholder="Search transcript"
+                      />
+                      <button id="search-prev" class="icon-btn" type="button" aria-label="Previous match" title="Previous match" disabled>
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m7.4 15.4 4.6-4.6 4.6 4.6L18 14l-6-6-6 6z"/></svg>
+                      </button>
+                      <button id="search-next" class="icon-btn" type="button" aria-label="Next match" title="Next match" disabled>
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z"/></svg>
+                      </button>
+                    </div>
+                    <p id="search-status" class="small search-status" role="status" aria-live="polite"></p>
+                  </div>
+                  <div class="language-row">
+                    <label for="target-language">Caption language</label>
+                    <select id="target-language" aria-describedby="translation-status">
+                      <option value="">Original spoken language</option>
+                      <option value="en">English</option>
+                      <option value="sw">Kiswahili</option>
+                    </select>
+                    <p id="translation-status" class="small" role="status" aria-live="polite"></p>
+                  </div>
+                  <ol id="transcript" class="transcript"></ol>
+                </section>
+      </div>
     </main>
   </body>
 </html>

@@ -28,10 +28,12 @@ test('the empty state offers an upload button and a link field before any video 
   assert.equal(accessibleName($('#load-link')), 'Load link');
 });
 
-test('the page is only the video section: no transcript, AI, caption JSON or provider controls', () => {
-  for (const id of ['transcript-panel', 'transcript', 'transcript-search', 'summarize', 'translate', 'target-language',
-    'text-ai-consent', 'download-json', 'download-transcript', 'caption-file', 'provider', 'language', 'mode',
-    'hosted-consent', 'transcript-toggle', 'time-status', 'demo-warning']) {
+test('the transcript panel, language choice and toggle are on the page; AI summaries and consent are not', () => {
+  for (const id of ['transcript-panel', 'transcript', 'transcript-search', 'target-language', 'transcript-toggle', 'download-transcript']) {
+    assert.ok(document.getElementById(id), `#${id} present`);
+  }
+  assert.equal(accessibleName($('#transcript-toggle')), 'Transcript');
+  for (const id of ['summarize', 'summarise-transcript', 'text-ai-consent', 'translate', 'caption-file', 'provider', 'language', 'mode', 'hosted-consent', 'download-json', 'time-status']) {
     assert.equal(document.getElementById(id), null, `#${id} removed`);
   }
 });

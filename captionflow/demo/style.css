@@ -1164,7 +1164,7 @@ button:disabled {
 }
 
 .page {
-    max-width: 960px;
+    max-width: 1280px;
     margin: 24px auto;
     padding: 0 16px
 }
@@ -1256,4 +1256,18 @@ button:disabled {
     margin: 12px 0 0;
     color: #264d65;
     font-weight: 600
+}
+
+.language-row {
+    display: grid;
+    gap: 6px;
+    margin: 10px 0
+}
+
+.language-row select {
+    max-width: 320px;
+    min-height: 40px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid #aebdc9
 }

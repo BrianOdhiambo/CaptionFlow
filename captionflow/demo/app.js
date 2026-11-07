@@ -2,10 +2,14 @@ import { selectActiveCue, nextCue, replayCue } from '/player-sync.mjs';
 import { HIDE_CONTROLS_AFTER_MS, shouldHideControls, shortcutFor, cueLabel, clampSpeed, stepSpeed, speedLabel, paceSummary } from '/player-controls.mjs';
 import { connectCaptionSettingsPort } from '/caption-settings-port.mjs';
 import '/caption-settings-panel.mjs';
+import { viewCaptionsForMode } from '/caption-view.mjs';
 import { wordTimings, activeWordIndex as spokenWordIndex } from '/caption-words.mjs';
 
 const byId = id => document.getElementById(id);
 const ids = ['video', 'video-file', 'video-link', 'load-link', 'link-form', 'empty-state', 'change-video', 'video-shell',
+  'watch-layout', 'transcript-panel', 'transcript', 'transcript-toggle', 'transcript-options-button', 'transcript-options',
+  'follow', 'show-times', 'transcript-size', 'download-transcript', 'transcript-search', 'search-prev', 'search-next', 'search-status',
+  'target-language', 'translation-status',
   'player-bar', 'player-hint', 'play', 'time', 'seek', 'replay', 'next', 'pace-button', 'pace-text', 'pace-menu',
   'speed-slider', 'speed-value', 'speed-down', 'speed-up', 'pause-each-caption', 'cc', 'mute', 'fullscreen',
   'caption', 'caption-wrap', 'caption-settings-root', 'message'];
@@ -20,6 +24,11 @@ let objectUrl = null;
 let selectedProvider = null;
 let providerAvailability = { local: false, hosted: false };
 let speed = 1;
+let source = 'generated';
+let textAIAvailable = false;
+let isTranslating = false;
+let matchIds = [];
+let matchIndex = -1;
 let pauseEachCaption = false;
 const timeLabel = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 const message = text => { els.message.textContent = text; };
@@ -82,6 +91,193 @@ function followSpokenWords() {
 requestAnimationFrame(followSpokenWords);
 
 
+function renderTranscript() {
+  els.transcript.replaceChildren();
+  for (const cue of cues) {
+    const li = document.createElement('li');
+    li.dataset.id = cue.id;
+    const button = document.createElement('button');
+    button.type = 'button';
+    const timestamp = document.createElement('span');
+    timestamp.className = 'time';
+    timestamp.textContent = timeLabel(cue.start);
+    const text = document.createElement('span');
+    text.className = 'line-text';
+    text.textContent = cue.displayText;
+    button.append(timestamp, ' ', text);
+    if (cue.status && cue.status !== 'ready') {
+      const flag = document.createElement('span');
+      flag.className = 'flag';
+      flag.textContent = cue.status === 'needs-review' ? ' Unreviewed wording' : ' Original fallback';
+      button.append(' ', flag);
+    }
+    button.addEventListener('click', () => {
+      els.video.currentTime = cue.start;
+      sync();
+      els.video.focus();
+    });
+    li.append(button);
+    els.transcript.append(li);
+  }
+  applySearch();
+}
+
+function appendHighlighted(parent, text, query) {
+  parent.replaceChildren();
+  if (!query) {
+    parent.textContent = text;
+    return;
+  }
+  const lowerText = text.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  let from = 0;
+  for (let at = lowerText.indexOf(lowerQuery); at !== -1; at = lowerText.indexOf(lowerQuery, from)) {
+    if (at > from) parent.append(text.slice(from, at));
+    const mark = document.createElement('mark');
+    mark.textContent = text.slice(at, at + query.length);
+    parent.append(mark);
+    from = at + query.length;
+  }
+  if (from < text.length) parent.append(text.slice(from));
+}
+
+function searchQuery() {
+  return els['transcript-search'].value.trim();
+}
+
+function applySearch() {
+  const query = searchQuery();
+  matchIds = query ? cues.filter(cue => cue.displayText.toLowerCase().includes(query.toLowerCase())).map(cue => cue.id) : [];
+  matchIndex = -1;
+  for (const li of els.transcript.children) {
+    const isMatch = matchIds.includes(li.dataset.id);
+    li.classList.toggle('match', isMatch);
+    li.classList.remove('match-current');
+    appendHighlighted(li.querySelector('.line-text'), cues.find(cue => cue.id === li.dataset.id).displayText, query);
+  }
+  updateSearchControls();
+}
+
+function updateSearchControls() {
+  const count = matchIds.length;
+  els['search-prev'].disabled = count === 0;
+  els['search-next'].disabled = count === 0;
+  if (!searchQuery()) els['search-status'].textContent = '';
+  else if (count === 0) els['search-status'].textContent = 'No matches in this transcript.';
+  else if (matchIndex < 0) els['search-status'].textContent = `${count} ${count === 1 ? 'match' : 'matches'}. Press Next match to start.`;
+  else els['search-status'].textContent = `Match ${matchIndex + 1} of ${count}.`;
+}
+
+function goToMatch(step) {
+  if (!matchIds.length) return;
+  const count = matchIds.length;
+  matchIndex = matchIndex < 0 ? (step > 0 ? 0 : count - 1) : (matchIndex + step + count) % count;
+  const id = matchIds[matchIndex];
+  const cue = cues.find(item => item.id === id);
+  for (const li of els.transcript.children) li.classList.toggle('match-current', li.dataset.id === id);
+  els.video.currentTime = cue.start;
+  const line = els.transcript.querySelector(`li[data-id="${CSS.escape(id)}"]`);
+  scrollLineIntoTranscript(line);
+  sync();
+  updateSearchControls();
+}
+
+function scrollLineIntoTranscript(line) {
+  if (!line) return;
+  const top = line.offsetTop - els.transcript.clientHeight / 2 + line.offsetHeight / 2;
+  els.transcript.scrollTo({ top, behavior: 'auto' });
+}
+
+function followActiveLine() {
+  scrollLineIntoTranscript(els.transcript.querySelector('.active'));
+}
+
+function transcriptText() {
+  return cues.map(cue => `[${timeLabel(cue.start)}] ${cue.displayText}`).join('\n');
+}
+
+
+function applyGeneratedMode() {
+  if (!['generated', 'external'].includes(source) || !payload?.transcript?.segments) return;
+  const desiredLanguage = displayLanguage();
+  const desiredMode = 'original';
+  const changed = {
+    ...payload,
+    captions: viewCaptionsForMode(payload, { language: desiredLanguage, mode: desiredMode }),
+  };
+  setCaptions(changed, source);
+  if (changed.captions.some(c => c.language !== desiredLanguage)) {
+    message(`Translation to ${desiredLanguage} is not loaded. Click Translate captions with AI; showing original speech text for now.`);
+  } else if (desiredLanguage !== payload.sourceLanguage) {
+    message(`Showing AI-translated ${desiredLanguage === 'sw' ? 'Kiswahili' : 'English'} captions. Check the unreviewed wording against the original.`);
+  } else if (desiredMode === 'plain') {
+    const reviewed = changed.captions.filter(c => c.status === 'needs-review').length;
+    message(reviewed
+      ? `Showing ${changed.captions.length} timed captions with ${reviewed} experimental wording suggestions. Review the changes; original text is always available.`
+      : 'No safe rule-based rewrite was found for these captions. Showing original speech rather than inventing simpler wording.');
+  } else {
+    message(`Showing ${cues.length} original timed captions from ${payload.provider || 'the selected provider'}.`);
+  }
+}
+
+function displayLanguage() {
+  return els['target-language'].value || payload?.sourceLanguage || 'en';
+}
+
+function updateTextActions() {
+  els['target-language'].disabled = !payload?.transcript?.segments?.length || isTranslating;
+}
+
+function clearTranscript() {
+  els.transcript.replaceChildren();
+  payload = null;
+  els['download-transcript'].disabled = true;
+  els['target-language'].value = '';
+  els['translation-status'].textContent = 'Captions in another language appear here once the video has captions.';
+  updateTextActions();
+}
+
+async function translateSelected() {
+  const targetLanguage = els['target-language'].value;
+  if (!payload?.transcript?.segments) return;
+  if (targetLanguage === '' || targetLanguage === payload.sourceLanguage) {
+    applyGeneratedMode();
+    els['translation-status'].textContent = 'Showing the original spoken language.';
+    return;
+  }
+  if (!textAIAvailable) {
+    els['translation-status'].textContent = 'Translation is not configured on this server.';
+    return;
+  }
+  if (payload?.captionVariants?.translations?.[targetLanguage]) {
+    applyGeneratedMode();
+    els['translation-status'].textContent = 'Using the translation already created for this video.';
+    return;
+  }
+  const selectedVideoVersion = videoSelectionVersion;
+  const transcript = payload.transcript;
+  isTranslating = true;
+  updateTextActions();
+  els['translation-status'].textContent = 'Translating captions…';
+  try {
+    const response = await fetch('/api/translate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript, targetLanguage, consent: true }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `Translation HTTP ${response.status}`);
+    if (selectedVideoVersion !== videoSelectionVersion || payload?.transcript !== transcript) return;
+    if (data.videoId !== transcript.videoId || data.targetLanguage !== targetLanguage) throw new Error('Translation response does not match the selected video');
+    payload = { ...payload, captionVariants: { ...payload.captionVariants,
+      translations: { ...payload.captionVariants?.translations, [targetLanguage]: data.captions } } };
+    applyGeneratedMode();
+    const failed = data.captions.filter(c => c.status === 'fallback').length;
+    els['translation-status'].textContent = `Translation ready. ${failed ? `${failed} lines fell back to the original. ` : ''}AI wording needs review.`;
+  } catch (error) {
+    els['translation-status'].textContent = `Could not translate: ${error.message}`;
+  } finally { isTranslating = false; updateTextActions(); }
+}
+
 function sync() {
   const time = els.video.currentTime || 0;
   const cue = selectActiveCue(cues, time);
@@ -93,7 +289,17 @@ function sync() {
     els.caption.textContent = '';
   }
   if (skipManualPauseForCueId && cue?.id !== skipManualPauseForCueId) skipManualPauseForCueId = null;
+  const previousCueId = currentCueId;
   currentCueId = cue?.id ?? null;
+  if (currentCueId !== previousCueId) {
+    for (const li of els.transcript.children) {
+      const isActive = li.dataset.id === currentCueId;
+      li.classList.toggle('active', isActive);
+      if (isActive) li.firstElementChild.setAttribute('aria-current', 'true');
+      else li.firstElementChild.removeAttribute('aria-current');
+    }
+    if (currentCueId && els.follow.checked) followActiveLine();
+  }
   updateTime();
   if (cue && pauseEachCaption && !els.video.paused &&
       cue.id !== lastManualPausedId && cue.id !== skipManualPauseForCueId &&
@@ -118,6 +324,11 @@ function setCaptions(data) {
   lastManualPausedId = null;
   skipManualPauseForCueId = null;
   wordCueId = null;
+  source = 'generated';
+  renderTranscript();
+  els['translation-status'].textContent = '';
+  els['download-transcript'].disabled = false;
+  updateTextActions();
   sync();
   els.replay.disabled = false;
   els.next.disabled = false;
@@ -138,6 +349,7 @@ function resetToEmpty() {
   els.replay.disabled = true;
   els.next.disabled = true;
   els['video-file'].value = '';
+  clearTranscript();
   setHasVideo(false);
   message('');
 }
@@ -160,6 +372,7 @@ async function loadVideo(file) {
   els.caption.textContent = '';
   els.replay.disabled = true;
   els.next.disabled = true;
+  clearTranscript();
   setHasVideo(true);
   const provider = captionProvider();
   if (!provider) {
@@ -232,6 +445,68 @@ els['video-file'].addEventListener('change', () => {
   if (file) loadVideo(file);
 });
 els['link-form'].addEventListener('submit', loadLink);
+els['target-language'].addEventListener('change', translateSelected);
+els['transcript-size'].addEventListener('change', () => { els.transcript.dataset.size = els['transcript-size'].value; });
+els['show-times'].addEventListener('change', () => els.transcript.classList.toggle('hide-times', !els['show-times'].checked));
+els['transcript-search'].addEventListener('input', applySearch);
+els['transcript-search'].addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    goToMatch(event.shiftKey ? -1 : 1);
+  }
+});
+els['search-next'].addEventListener('click', () => goToMatch(1));
+els['search-prev'].addEventListener('click', () => goToMatch(-1));
+els['download-transcript'].addEventListener('click', () => {
+  if (!cues.length) return;
+  const url = URL.createObjectURL(new Blob([transcriptText()], { type: 'text/plain' }));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `${payload?.videoId || 'captionflow'}-${displayLanguage()}-transcript.txt`;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+function openTranscriptOptions() {
+  els['transcript-options'].hidden = false;
+  els['transcript-options-button'].setAttribute('aria-expanded', 'true');
+  els.follow.focus();
+}
+function closeTranscriptOptions({ focusButton = false } = {}) {
+  if (els['transcript-options'].hidden) return;
+  els['transcript-options'].hidden = true;
+  els['transcript-options-button'].setAttribute('aria-expanded', 'false');
+  if (focusButton) els['transcript-options-button'].focus();
+}
+els['transcript-options-button'].addEventListener('click', () => {
+  if (els['transcript-options'].hidden) openTranscriptOptions(); else closeTranscriptOptions();
+});
+els['transcript-options'].addEventListener('keydown', event => {
+  if (event.key !== 'Escape') return;
+  event.preventDefault();
+  closeTranscriptOptions({ focusButton: true });
+});
+els['transcript-options'].addEventListener('focusout', event => {
+  if (event.relatedTarget && !els['transcript-options-button'].parentElement.contains(event.relatedTarget)) closeTranscriptOptions();
+});
+document.addEventListener('pointerdown', event => {
+  if (!els['transcript-options-button'].parentElement.contains(event.target)) closeTranscriptOptions();
+});
+
+const TRANSCRIPT_VISIBLE_KEY = 'captionflow.transcriptVisible';
+function setTranscriptVisible(visible) {
+  els['transcript-panel'].hidden = !visible;
+  els['watch-layout'].classList.toggle('transcript-hidden', !visible);
+  els['transcript-toggle'].setAttribute('aria-pressed', String(visible));
+  els['transcript-toggle'].title = visible ? 'Hide transcript' : 'Show transcript';
+  try { browserStorage()?.setItem(TRANSCRIPT_VISIBLE_KEY, String(visible)); } catch {}
+  if (visible) followActiveLine();
+}
+els['transcript-toggle'].addEventListener('click', () => {
+  setTranscriptVisible(els['transcript-panel'].hidden);
+  noteActivity();
+});
+
+
 els['change-video'].addEventListener('click', resetToEmpty);
 
 function applyPace() {
@@ -500,6 +775,8 @@ window.addEventListener('beforeunload', () => { if (objectUrl) URL.revokeObjectU
 
 
 setHasVideo(false);
+setTranscriptVisible((() => { try { return browserStorage()?.getItem(TRANSCRIPT_VISIBLE_KEY) !== 'false'; } catch { return true; } })());
+clearTranscript();
 els.replay.disabled = true;
 els.next.disabled = true;
 try {
@@ -508,6 +785,7 @@ try {
   const prefs = await prefsResponse.json();
   if (!providersResponse.ok || !prefsResponse.ok) throw new Error(providers.error || prefs.error || 'Setup failed');
   providerAvailability = { local: Boolean(providers.providers?.local), hosted: Boolean(providers.providers?.hosted) };
+  textAIAvailable = Boolean(providers.textAI);
   selectedProvider = providers.defaultProvider === 'local' ? 'local' : 'hosted';
   captionSettings.loadSavedStyle({ fontScale: prefs.fontScale });
   applyPace();
