@@ -176,7 +176,8 @@ video {
 }
 
 /* Caption style comes from CSS variables set by the caption settings port. */
-.caption-wrap>div {
+.caption-wrap>div,
+.caption-preview>div {
     background: rgba(0, 0, 0, .87);
     background: color-mix(in srgb, var(--caption-bg, #000000) calc(var(--caption-bg-opacity, .87) * 100%), transparent);
     color: var(--caption-color, #ffffff);
@@ -190,13 +191,15 @@ video {
     overflow-wrap: anywhere
 }
 
-.caption-wrap.contrast-high>div {
+.caption-wrap.contrast-high>div,
+.caption-preview.contrast-high>div {
     background: var(--caption-bg, #000000);
     outline: 2px solid var(--caption-color, #ffffff);
     font-weight: 800
 }
 
-.caption-wrap.contrast-inverted>div {
+.caption-wrap.contrast-inverted>div,
+.caption-preview.contrast-inverted>div {
     background: var(--caption-color, #ffffff);
     color: var(--caption-bg, #000000)
 }
@@ -435,12 +438,13 @@ video {
 
 /* The caption settings panel renders inside this mount; it stays in full screen. */
 .caption-settings-root {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    z-index: 3;
-    width: min(360px, calc(100% - 24px));
-    max-height: calc(100% - var(--bar-height, 64px) - 24px);
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    width: min(440px, calc(100vw - 24px));
+    max-height: calc(100vh - 24px);
     overflow: auto
 }
 
@@ -468,6 +472,119 @@ video {
 
 .caption-settings-placeholder button {
     min-height: 44px
+}
+
+.caption-settings-panel {
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    background: #ffffff;
+    color: #13263a;
+    border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, .45)
+}
+
+.cs-title {
+    margin: 0;
+    font-size: 1.1rem
+}
+
+.caption-preview {
+    position: relative;
+    min-height: 72px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 10px;
+    border-radius: 8px;
+    background: #1c1c22
+}
+
+.caption-preview>div {
+    max-width: 100%;
+    text-align: center
+}
+
+.cs-notice {
+    margin: 0;
+    font-size: .92rem;
+    line-height: 1.45
+}
+
+.cs-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    border: 0
+}
+
+.cs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px
+}
+
+.cs-field {
+    display: grid;
+    gap: 4px
+}
+
+.cs-label {
+    font-size: .9rem;
+    font-weight: 600
+}
+
+.cs-input,
+.cs-color {
+    min-height: 44px;
+    width: 100%;
+    border: 1px solid #aebdc9;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #1b3043;
+    padding: 6px 8px
+}
+
+.cs-range {
+    width: 100%;
+    min-height: 44px
+}
+
+.cs-button {
+    min-height: 44px;
+    padding: 8px 14px;
+    border: 1px solid #aebdc9;
+    border-radius: 8px;
+    background: #e6f1f8;
+    color: #1b3043;
+    font-weight: 700;
+    cursor: pointer
+}
+
+.cs-button[aria-pressed=true] {
+    background: #10283d;
+    color: #ffffff
+}
+
+.cs-primary {
+    background: #d4eae0;
+    border-color: #7eb79c
+}
+
+.cs-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px
+}
+
+.caption-settings-panel button:focus-visible,
+.caption-settings-panel select:focus-visible,
+.caption-settings-panel input:focus-visible {
+    outline: 3px solid #df8f2a;
+    outline-offset: 2px
 }
 
 .video-shell:fullscreen {

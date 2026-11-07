@@ -2,6 +2,7 @@ import { selectActiveCue, nextCue, replayCue } from '/player-sync.mjs';
 import { viewCaptionsForMode } from '/caption-view.mjs';
 import { HIDE_CONTROLS_AFTER_MS, shouldHideControls, shortcutFor, cueLabel } from '/player-controls.mjs';
 import { connectCaptionSettingsPort } from '/caption-settings-port.mjs';
+import '/caption-settings-panel.mjs';
 
 const byId = id => document.getElementById(id);
 const ids = ['video','video-file','caption-file','caption','caption-wrap','language','mode','replay','next','transcript','message','time-status','provider','generate','provider-note','hosted-consent-wrap','hosted-consent','download-json','download-transcript','demo-warning','caption-status',
