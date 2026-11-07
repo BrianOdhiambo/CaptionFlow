@@ -27,72 +27,19 @@
       </section>
       <section class="panel controls" aria-labelledby="setup-title">
         <h2 id="setup-title">1. Choose your video and captions</h2>
-        <div class="control-grid">
-          <label
-            >Video from your device
-            <input
-              id="video-file"
-              type="file"
-              accept="video/mp4,video/webm,video/ogg,video/quicktime"
-          /></label>
-          <label
-            >CaptionFlow JSON (optional)
-            <input
-              id="caption-file"
-              type="file"
-              accept=".json,application/json"
-          /></label>
-          <label
-            >Caption provider
-            <select id="provider">
-              <option value="fixture">Fixture: sample captions</option>
-              <option value="local">Local: faster-whisper</option>
-              <option value="hosted">Hosted: event API</option>
-            </select></label
-          >
-          <label
-            >Language
-            <select id="language">
-              <option value="en">English</option>
-              <option value="sw">Kiswahili</option>
-              <option value="auto">Auto-detect speech (local/hosted)</option>
-            </select></label
-          >
-          <label
-            >Caption version
-            <select id="mode">
-              <option value="original">Original spoken words</option>
-              <option value="plain">
-                Plain-language suggestions (review required)
-              </option>
-            </select></label
-          >
-        </div>
-        <p id="provider-note" class="small"></p>
-        <p id="caption-status" class="caption-status">
-          Select a video, then generate captions for that video.
+        <label class="upload-field"
+          >Video from your device
+          <input
+            id="video-file"
+            type="file"
+            accept="video/mp4,video/webm,video/ogg,video/quicktime"
+        /></label>
+        <p id="caption-status" class="caption-status" role="status" aria-live="polite">
+          Choose a video, then generate captions for it.
         </p>
-        <label id="hosted-consent-wrap" class="consent" hidden
-          ><input type="checkbox" id="hosted-consent" /> I have permission to
-          send this video to the configured external transcription
-          service.</label
-        >
         <div class="actions">
-          <button id="generate" type="button">Load sample captions</button
-          ><button id="download-json" type="button" disabled>
-            Save caption JSON
-          </button>
+          <button id="generate" type="button" disabled>Generate captions from this video</button>
         </div>
-        <p class="small">
-          To test sync, use Local mode with the same video you play. The video
-          is copied temporarily to this loopback server for transcription, then
-          deleted. In Hosted mode, an additional copy goes to the configured
-          external provider only after your consent.
-        </p>
-        <p id="demo-warning" class="small">
-          <strong>Fixture warning:</strong> These are fictional captions and are
-          not synchronized to a chosen video.
-        </p>
       </section>
       <section class="panel" aria-labelledby="view-title">
         <h2 id="view-title">2. Watch and read</h2>

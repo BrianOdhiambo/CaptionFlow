@@ -6,7 +6,7 @@ import '/caption-settings-panel.mjs';
 import { wordTimings, activeWordIndex as spokenWordIndex } from '/caption-words.mjs';
 
 const byId = id => document.getElementById(id);
-const ids = ['video','video-file','caption-file','caption','caption-wrap','language','mode','replay','next','transcript','message','time-status','provider','generate','provider-note','hosted-consent-wrap','hosted-consent','download-json','download-transcript','demo-warning','caption-status',
+const ids = ['video','video-file','caption','caption-wrap','replay','next','transcript','message','time-status','generate','download-transcript','caption-status',
   'video-shell','player-bar','player-hint','play','time','seek','pace-button','pace-text','pace-menu','speed-slider','speed-value','speed-down','speed-up','pause-each-caption','transcript-toggle','watch-layout','transcript-panel','cc','mute','fullscreen','caption-settings-root',
   'transcript-options-button','transcript-options','follow','show-times','transcript-size','transcript-search','search-prev','search-next','search-status','summarise-transcript','target-language','translate','translation-status','text-ai-consent','summarize','summary-status','summary-points'];
 
@@ -14,6 +14,7 @@ const els = Object.fromEntries(ids.map(id => [id, byId(id)]));
 let cues = [];
 let payload = null;
 let source = 'fixture';  // fixture | generated | external
+let selectedProvider = 'fixture';
 let currentCueId = null;
 let lastManualPausedId = null;
 let skipManualPauseForCueId = null;
@@ -259,12 +260,10 @@ function setCaptions(data, nextSource) {
   sentenceReplayUntil = null;
   renderTranscript();
   sync();
-  els['download-json'].disabled = false;
   els['download-transcript'].disabled = false;
   els['summarise-transcript'].disabled = false;
   els.replay.disabled = false;
   els.next.disabled = false;
-  els['demo-warning'].hidden = nextSource !== 'fixture';
   updateTextActions();
   showCachedSummary();
 }
@@ -302,7 +301,7 @@ function clearTextOutputs() {
 function applyGeneratedMode() {
   if (!['generated', 'external'].includes(source) || !payload?.transcript?.segments) return;
   const desiredLanguage = displayLanguage();
-  const desiredMode = els.mode.value;
+  const desiredMode = 'original';
   const changed = {
     ...payload,
     captions: viewCaptionsForMode(payload, { language: desiredLanguage, mode: desiredMode }),
@@ -322,8 +321,7 @@ function applyGeneratedMode() {
   }
 }
 async function loadDemoCues() {
-  const language = els.language.value === 'sw' ? 'sw' : 'en';
-  const params = new URLSearchParams({ lang: language, mode: els.mode.value });
+  const params = new URLSearchParams({ lang: 'en', mode: 'original' });
   const response = await fetch(`/api/captions?${params}`);
   const data = await response.json();
   if (!response.ok) throw new Error(data.error ?? 'Fixture captions unavailable');
@@ -337,15 +335,10 @@ function applyPace() {
   sync();
 }
 function updateProviderUI() {
-  const provider = els.provider.value;
-  els['hosted-consent-wrap'].hidden = provider !== 'hosted';
-  els.generate.textContent = provider === 'fixture' ? 'Load sample captions' : 'Generate captions from this video';
-  els.generate.disabled = isGenerating || !providerAvailability[provider];
-  els['provider-note'].textContent = provider === 'fixture'
-    ? 'Fixture mode loads fictional captions for interface testing. They do not correspond to your selected video.'
-    : provider === 'local'
-      ? 'Local mode temporarily sends this video to the loopback server running faster-whisper. The temporary file is deleted afterward.'
-      : 'Hosted mode sends your video to the configured external ASR endpoint. Use only consented material. Requires a compatible endpoint and token.';
+  const needsVideo = selectedProvider !== 'fixture';
+  const hasVideo = Boolean(els['video-file'].files?.length);
+  els.generate.textContent = selectedProvider === 'fixture' ? 'Load sample captions' : 'Generate captions from this video';
+  els.generate.disabled = isGenerating || !providerAvailability[selectedProvider] || (needsVideo && !hasVideo);
 }
 
 els['video-file'].addEventListener('change', () => {
@@ -360,8 +353,9 @@ els['video-file'].addEventListener('change', () => {
     clearTextOutputs();
     els.transcript.replaceChildren();
     els.caption.textContent = 'Choose a video to begin.';
-    els.replay.disabled = true; els.next.disabled = true; els['download-json'].disabled = true; els['download-transcript'].disabled = true; els['summarise-transcript'].disabled = true;
-    message('No video or captions selected. Choose a video to continue.');
+    els.replay.disabled = true; els.next.disabled = true; els['download-transcript'].disabled = true; els['summarise-transcript'].disabled = true;
+    updateProviderUI();
+  message('No video or captions selected. Choose a video to continue.');
     return;
   }
   els['player-hint'].hidden = true;
@@ -374,27 +368,15 @@ els['video-file'].addEventListener('change', () => {
   els.transcript.replaceChildren();
   els.caption.textContent = 'No captions yet';
   els.replay.disabled = true; els.next.disabled = true;
-  els['download-json'].disabled = true;
   els['download-transcript'].disabled = true; els['summarise-transcript'].disabled = true;
-  els['demo-warning'].hidden = true;
   clearTextOutputs();
-  message('Video opened. Select Local and generate matching timed captions, or load a transcript JSON for this exact clip.');
+  updateProviderUI();
+  message('Video ready. Click Generate captions from this video.');
 });
 
-els['caption-file'].addEventListener('change', async () => {
-  const file = els['caption-file'].files?.[0];
-  if (!file) return;
-  try {
-    const data = JSON.parse(await file.text());
-    const parsed = Array.isArray(data.captions) ? data : captionsFromTranscript(data);
-    els['target-language'].value = '';
-    setCaptions(parsed, 'external');
-    message(`Loaded ${cues.length} caption segments from JSON. Verify they match the selected video and its timestamps.`);
-  } catch (error) { message(`Unable to load caption JSON: ${error.message}`); }
-});
 
 els.generate.addEventListener('click', async () => {
-  const provider = els.provider.value;
+  const provider = selectedProvider;
   if (provider === 'fixture') {
     try { await loadDemoCues(); }
     catch (error) { message(error.message); }
@@ -403,14 +385,10 @@ els.generate.addEventListener('click', async () => {
   const file = els['video-file'].files?.[0];
   if (!file) { message('Choose a video file first.'); return; }
   const selectionVersion = videoSelectionVersion;
-  if (provider === 'hosted' && !els['hosted-consent'].checked) {
-    message('Please explicitly consent to sending this video to the hosted ASR endpoint.'); return;
-  }
-  const language = els.language.value;
-  const params = new URLSearchParams({ provider, language, mode: els.mode.value, consent: provider === 'hosted' ? 'yes' : 'no' });
+  const params = new URLSearchParams({ provider, language: 'auto', mode: 'original', consent: provider === 'hosted' ? 'yes' : 'no' });
   isGenerating = true;
   updateProviderUI();
-  message(provider === 'local' ? 'Local faster-whisper is transcribing the selected video. This can take a while on a CPU…' : 'Sending consented video to the configured hosted transcription service…');
+  message(provider === 'local' ? 'Local faster-whisper is transcribing the selected video. This can take a while on a CPU…' : 'Creating captions for your video…');
   try {
     const response = await fetch(`/api/transcribe?${params}`, {
       method: 'POST', headers: { 'Content-Type': file.type || 'video/mp4' }, body: file,
@@ -423,7 +401,6 @@ els.generate.addEventListener('click', async () => {
     }
     els['target-language'].value = '';
     setCaptions(data, 'generated');
-    if (['en', 'sw'].includes(data.sourceLanguage)) els.language.value = data.sourceLanguage;
     applyGeneratedMode();
     if (Number.isFinite(els.video.duration) && cues.at(-1)?.end > els.video.duration + 1) {
       message('Warning: generated captions extend past this video duration. Verify the video and ASR output.');
@@ -432,18 +409,6 @@ els.generate.addEventListener('click', async () => {
   finally { isGenerating = false; updateProviderUI(); }
 });
 
-els.provider.addEventListener('change', () => {
-  if (els.provider.value !== 'fixture') els.mode.value = 'original';
-  updateProviderUI();
-});
-els.language.addEventListener('change', () => {
-  if (source === 'fixture') loadDemoCues().catch(error => message(error.message));
-  else message('Spoken-language selection applies when generating captions. Use Caption display language to translate existing captions.');
-});
-els.mode.addEventListener('change', () => {
-  if (['generated', 'external'].includes(source) && payload?.transcript?.segments) applyGeneratedMode();
-  else if (source === 'fixture') loadDemoCues().catch(error => message(error.message));
-});
 els['target-language'].addEventListener('change', () => {
   if (['generated', 'external'].includes(source) && payload?.transcript?.segments) applyGeneratedMode();
   showCachedSummary();
@@ -524,16 +489,6 @@ function next() {
 }
 els.replay.addEventListener('click', replay);
 els.next.addEventListener('click', next);
-els['download-json'].addEventListener('click', () => {
-  if (!payload) return;
-  const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `${payload.videoId || 'captionflow'}-captions.json`;
-  anchor.click();
-  // Allow the click to consume its object URL; release after the next task.
-  queueMicrotask(() => URL.revokeObjectURL(url));
-});
 els.translate.addEventListener('click', async () => {
   if (!payload?.transcript?.segments || !textAIAvailable || isTranslating) return;
   const targetLanguage = els['target-language'].value;
@@ -886,11 +841,10 @@ try {
   providerAvailability = providers.providers;
   textAIAvailable = Boolean(providers.textAI);
   updateTextActions();
-  for (const option of els.provider.options) option.disabled = !providerAvailability[option.value];
-  els.provider.value = providerAvailability[providers.defaultProvider] ? providers.defaultProvider : 'fixture';
+  selectedProvider = providerAvailability[providers.defaultProvider] ? providers.defaultProvider : 'fixture';
   captionSettings.loadSavedStyle({ fontScale: prefs.fontScale });
   updateProviderUI();
-  if (els.provider.value === 'fixture') await loadDemoCues();
-  else { els.mode.value = 'original'; message('Select a local video and generate timed captions.'); }
+  if (selectedProvider === 'fixture') await loadDemoCues();
+  else message('Choose a video, then generate captions for it.');
   applyPace();
 } catch (error) { message(`Setup failed: ${error.message}`); }
