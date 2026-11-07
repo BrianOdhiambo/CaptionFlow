@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CaptionsPanelComponent } from '../../components/captions-panel/captions-panel.component';
+import { CaptionAppearanceSettingsComponent } from '../../components/caption-appearance-settings/caption-appearance-settings.component';
 import { ReadingSettingsComponent } from '../../components/reading-settings/reading-settings.component';
 import { VideoPlayerComponent } from '../../components/video-player/video-player.component';
 import { Caption } from '../../models/caption.model';
@@ -9,12 +10,19 @@ import { PLAYBACK_STATE } from '../../playback/playback-state';
 import { VideoElementPlayer } from '../../playback/video-element-player';
 import { VIDEO_SURFACE } from '../../playback/video-surface';
 import { MediaStore } from '../../services/media-store.service';
+import { CaptionAppearanceService } from '../../services/caption-appearance.service';
 import { ReadingSettings } from '../../services/reading-settings.service';
 import { captionIndexAt } from '../../utils/caption-index';
 import { pacingRate } from '../../utils/reading-pace';
 
 @Component({
-  imports: [RouterLink, CaptionsPanelComponent, ReadingSettingsComponent, VideoPlayerComponent],
+  imports: [
+    RouterLink,
+    CaptionsPanelComponent,
+    CaptionAppearanceSettingsComponent,
+    ReadingSettingsComponent,
+    VideoPlayerComponent,
+  ],
   templateUrl: './player-page.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [
@@ -29,6 +37,7 @@ export class PlayerPageComponent {
   private readonly control = inject(PLAYBACK_CONTROL);
   private readonly state = inject(PLAYBACK_STATE);
   private readonly settings = inject(ReadingSettings);
+  protected readonly appearance = inject(CaptionAppearanceService).appearance;
   protected readonly activeIndex = computed(() =>
     captionIndexAt(this.media()?.captions ?? [], this.state.currentSeconds()),
   );
@@ -45,7 +54,10 @@ export class PlayerPageComponent {
   constructor() {
     effect(() => {
       const caption = this.activeCaption();
-      const rate = this.settings.pacingEnabled() && caption ? pacingRate(caption, this.settings.wordsPerMinute()) : 1;
+      const rate =
+        this.settings.pacingEnabled() && caption
+          ? pacingRate(caption, this.settings.wordsPerMinute())
+          : 1;
       this.control.setRate(rate);
     });
   }

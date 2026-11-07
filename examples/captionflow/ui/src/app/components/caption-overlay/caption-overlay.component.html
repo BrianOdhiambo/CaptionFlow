@@ -1,5 +1,19 @@
 @if (text()) {
-  <div class="position-absolute bottom-0 start-50 translate-middle-x w-100 text-center mb-5 pb-4 px-3">
-    <span class="caption-band mx-auto bg-black bg-opacity-75 text-white fs-5 fw-medium lh-sm px-3 py-2 rounded" [title]="text()">{{ text() }}</span>
+  <div [class]="layerClasses()">
+    <span
+      [class]="bandClasses()"
+      [style.--caption-font-size]="variables().fontSize"
+      [style.--caption-font-weight]="variables().fontWeight"
+      [style.--caption-line-height]="variables().lineHeight"
+      [style.--caption-letter-spacing]="variables().letterSpacing"
+      [style.--caption-padding-x]="variables().paddingHorizontal"
+      [style.--caption-padding-y]="variables().paddingVertical"
+      [style.--caption-radius]="variables().radius"
+      [style.--caption-text-color]="variables().textColor"
+      [style.--caption-box-color]="variables().boxColor"
+      [style.--caption-box-opacity]="variables().boxOpacity"
+      [title]="text()"
+      ><span class="caption-text">{{ text() }}</span></span
+    >
   </div>
 }

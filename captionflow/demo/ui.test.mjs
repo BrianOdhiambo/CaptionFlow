@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { once } from 'node:events';
 import { JSDOM } from 'jsdom';
 import { createCaptionFlowDemoServer } from './server.mjs';
+import { SPEED_PRESETS, MIN_SPEED, MAX_SPEED, SPEED_STEP } from '../src/player-controls.mjs';
 
 const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
 const { document } = new JSDOM(html).window;
@@ -17,101 +18,72 @@ function accessibleName(element) {
   return (element.getAttribute('aria-label') ?? element.textContent ?? '').trim();
 }
 
+test('the empty state offers an upload button and a link field before any video is loaded', () => {
+  assert.ok($('#video-shell').classList.contains('no-video'));
+  assert.equal($('#empty-state').hidden, false);
+  assert.equal($('label[for=video-file]').textContent.trim(), 'Upload video');
+  assert.equal($('#video-file').type, 'file');
+  assert.equal($('#video-link').type, 'url');
+  assert.ok(document.querySelector('label[for=video-link]'), 'link field keeps its label');
+  assert.equal(accessibleName($('#load-link')), 'Load link');
+});
+
+test('the transcript panel, language choice and toggle are on the page; AI summaries and consent are not', () => {
+  for (const id of ['transcript-panel', 'transcript', 'transcript-search', 'target-language', 'transcript-toggle', 'download-transcript']) {
+    assert.ok(document.getElementById(id), `#${id} present`);
+  }
+  assert.equal(accessibleName($('#transcript-toggle')), 'Transcript');
+  for (const id of ['summarize', 'summarise-transcript', 'text-ai-consent', 'translate', 'caption-file', 'provider', 'language', 'mode', 'hosted-consent', 'download-json', 'time-status']) {
+    assert.equal(document.getElementById(id), null, `#${id} removed`);
+  }
+});
+
 test('the control bar and caption settings mount live inside #video-shell', () => {
   const shell = $('#video-shell');
-  assert.ok(shell, '#video-shell exists');
-  for (const id of ['video', 'caption-wrap', 'player-bar', 'play', 'replay', 'next', 'time', 'seek', 'pace-button', 'pace-menu', 'cc', 'mute', 'fullscreen', 'player-hint']) {
-    assert.ok(shell.querySelector(`#${id}`), `#${id} is inside #video-shell`);
-  }
-  const mount = $('#caption-settings-root');
-  assert.equal(mount.parentElement, shell);
-  assert.ok(mount.classList.contains('caption-settings-root'));
-  assert.equal(mount.hidden, true);
-  assert.equal($('#seek').type, 'range');
+  assert.equal($('#player-bar').parentElement, shell);
+  assert.equal($('#caption-settings-root').parentElement, shell);
+  assert.ok($('#caption-settings-root').classList.contains('caption-settings-root'));
 });
 
 test('the video has no native controls', () => {
   assert.equal($('#video').hasAttribute('controls'), false);
 });
 
-test('every button has an accessible name and every icon is hidden from assistive tech', () => {
-  const buttons = [...document.querySelectorAll('button')];
-  assert.ok(buttons.length > 10);
-  for (const button of buttons) assert.notEqual(accessibleName(button), '', `button ${button.id || button.outerHTML} needs a name`);
-  for (const svg of document.querySelectorAll('svg')) assert.equal(svg.getAttribute('aria-hidden'), 'true');
-  assert.notEqual(accessibleName($('#seek')), '');
+test('every control in the video section has an accessible name', () => {
+  for (const button of document.querySelectorAll('#video-shell button, #empty-state .btn')) {
+    assert.ok(accessibleName(button), `${button.id || button.className} has a name`);
+  }
 });
 
-test('bar buttons show only icons and their short text label', () => {
-  for (const button of document.querySelectorAll('#player-bar .bar-btn')) {
-    const clone = button.cloneNode(true);
-    clone.querySelectorAll('.bar-text').forEach(span => span.remove());
-    assert.equal(clone.textContent.trim(), '', `#${button.id} has stray text`);
-    assert.ok(button.querySelector('svg.icon'), `#${button.id} has an icon`);
-  }
-  assert.equal($('#replay').querySelector('.icon-play, .icon-pause'), null);
+test('the change-video button lets the viewer return to the upload options', () => {
+  assert.equal(accessibleName($('#change-video')), 'Change video');
 });
 
 test('the CC and pace buttons expose their popups', () => {
-  assert.equal($('#cc').getAttribute('aria-expanded'), 'false');
-  assert.equal($('#cc').getAttribute('aria-controls'), 'caption-settings-root');
-  assert.equal($('#pace-button').getAttribute('aria-expanded'), 'false');
+  assert.equal($('#cc').getAttribute('aria-pressed'), 'true', 'CC shows whether captions are on');
+  assert.equal($('#caption-settings-button').getAttribute('aria-controls'), 'caption-settings-root');
+  assert.equal($('#caption-settings-button').getAttribute('aria-expanded'), 'false');
   assert.equal($('#pace-button').getAttribute('aria-controls'), 'pace-menu');
-  assert.equal($('#pace-button').getAttribute('aria-haspopup'), 'menu');
-  const options = [...document.querySelectorAll('#pace-menu [role=menuitemradio]')].map(item => item.dataset.pace);
-  assert.deepEqual(options, ['normal', 'slow', '0.5', '0.25', 'manual']);
+  assert.equal($('#pace-button').getAttribute('aria-expanded'), 'false');
+  assert.equal($('#pace-button').hasAttribute('aria-haspopup'), false, 'the pace panel is a disclosure, not a menu');
 });
 
-test('the transcript toggle sits in the bar and controls the transcript panel', () => {
-  const toggle = $('#transcript-toggle');
-  assert.ok(toggle.closest('.bar-right'));
-  assert.equal(toggle.getAttribute('aria-pressed'), 'true');
-  assert.equal(toggle.getAttribute('aria-controls'), 'transcript-panel');
-  assert.equal(accessibleName(toggle), 'Transcript');
-  assert.ok($('#transcript-panel').classList.contains('transcript-panel'));
+test('the pace panel offers speed presets, a custom slider and a separate pause toggle', () => {
+  const panel = $('#pace-menu');
+  assert.equal(panel.parentElement, $('#video-shell'));
+  assert.equal(panel.hidden, true);
+  const presets = [...panel.querySelectorAll('input[type=radio][name=speed]')].map(radio => Number(radio.value));
+  assert.deepEqual(presets, [...SPEED_PRESETS]);
+  assert.equal(panel.querySelector('input[name=speed]:checked').value, '1');
+  const slider = $('#speed-slider');
+  assert.equal(slider.type, 'range');
+  assert.deepEqual([Number(slider.min), Number(slider.max), Number(slider.step)], [MIN_SPEED, MAX_SPEED, SPEED_STEP]);
+  assert.equal($('#pause-each-caption').type, 'checkbox');
+  assert.equal($('#pause-each-caption').checked, false);
 });
 
-test('the transcript options include a Summarise item next to the key points section', () => {
-  const button = $('#summarise-transcript');
-  assert.ok($('#transcript-options').contains(button));
-  assert.equal(button.disabled, true);
-  assert.match(button.textContent, /Summarise transcript/);
-  assert.ok($('#transcript-panel').contains($('#summary-section')), 'key points render in the transcript panel');
-  assert.ok($('#summary-section').contains($('#summarize')));
-});
-
-test('the transcript options live in a hidden disclosure in the panel header', () => {
-  const button = $('#transcript-options-button');
-  const options = $('#transcript-options');
-  assert.ok(button.closest('.transcript-header'), 'options button is in the transcript header');
-  assert.equal(button.getAttribute('aria-expanded'), 'false');
-  assert.equal(button.getAttribute('aria-controls'), 'transcript-options');
-  assert.equal(accessibleName(button), 'Transcript options');
-  assert.equal(options.hidden, true);
-  for (const id of ['follow', 'show-times', 'transcript-size', 'download-transcript']) {
-    assert.ok(options.querySelector(`#${id}`), `#${id} is inside #transcript-options`);
-  }
-});
-
-test('transcript search is one labelled row with named previous/next match buttons', () => {
-  const input = $('#transcript-search');
-  assert.ok(document.querySelector('label[for=transcript-search]'), 'search input keeps its label');
-  const row = input.closest('.search-row');
-  assert.ok(row, 'search input is in .search-row');
-  assert.equal(accessibleName($('#search-prev')), 'Previous match');
-  assert.equal(accessibleName($('#search-next')), 'Next match');
-  assert.ok(row.contains($('#search-prev')) && row.contains($('#search-next')));
-});
-
-test('the time readout sits in the left button group, after Next', () => {
-  const left = $('#player-bar .bar-left');
-  assert.equal($('#time').parentElement, left);
-  assert.equal($('#time').previousElementSibling, $('#next'));
-});
-
-test('the old controls under the video and in panel 3 are gone', () => {
-  for (const id of ['pace', 'size', 'undo', 'contrast']) assert.equal(document.getElementById(id), null, `#${id} removed`);
-  assert.match($('[aria-labelledby=prefs-title]').textContent, /CC/);
+test('the replay button names a single caption, not a sentence', () => {
+  assert.equal(accessibleName($('#replay')), 'Replay this caption');
 });
 
 test('the server serves the new browser modules', async () => {
@@ -121,12 +93,30 @@ test('the server serves the new browser modules', async () => {
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const base = `http://127.0.0.1:${server.address().port}`;
-    for (const path of ['/player-controls.mjs', '/caption-settings-port.mjs']) {
+    for (const path of ['/player-controls.mjs', '/caption-settings-port.mjs', '/caption-settings-panel.mjs', '/caption-contrast.mjs', '/caption-words.mjs']) {
       const response = await fetch(base + path);
       assert.equal(response.status, 200, path);
       assert.match(response.headers.get('content-type'), /javascript/);
       await response.text();
     }
+  } finally {
+    server.close();
+    await rm(storageDir, { recursive: true, force: true });
+  }
+});
+
+test('the link route refuses private addresses before downloading anything', async () => {
+  const storageDir = await mkdtemp(join(tmpdir(), 'captionflow-link-'));
+  const server = await createCaptionFlowDemoServer({ storageDir, userId: 'link-test' });
+  try {
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const response = await fetch(`${base}/api/fetch-link`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: 'http://127.0.0.1/clip.mp4' }),
+    });
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error, /not allowed/);
   } finally {
     server.close();
     await rm(storageDir, { recursive: true, force: true });

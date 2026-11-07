@@ -33,6 +33,25 @@ These rules come from the DCMP Captioning Key ([print version](https://dcmp.org/
 - Every caption is on screen for at least 1 s 10 frames and at most 6 s.
 - Presentation rate defaults to 160 words per minute, the DCMP upper level.
 
+## Viewer-controlled caption appearance
+
+Approved by the project owner. This section narrows the Captions rules for viewer settings only. Everything else in this file still applies.
+
+1. The defaults in "Captions" remain the shipped look: white medium-weight text on a translucent black box, bottom position, 160 words per minute. A viewer may change the settings below. A viewer change never alters the shipped defaults.
+2. Viewers may change: font family (four named families), font size, font weight, line height, letter spacing, text colour, background colour, background opacity, horizontal and vertical padding, corner radius, text outline or shadow, caption position (top, centre or bottom), and contrast mode (normal, high, inverted or custom).
+3. Captions never exceed two lines at any setting. The caption element clamps to two lines whatever the font size, spacing or position.
+4. Caption positions top and centre are permitted. A caption must never cover the native video controls.
+5. Font families are semantic names. They map to fixed font stacks in the caption stylesheet. Viewers and stored settings never supply CSS text.
+6. Text outline and shadow are off by default. A viewer may turn them on.
+7. Accessibility floor: the defaults meet WCAG 2.2 SC 1.4.3 (4.5:1) with an opaque box. A selection below 4.5:1 shows a clear warning and keeps the viewer's colours; it is never silently changed. Where a box is translucent, the contrast is labelled as an estimate that depends on the video, and is never described as guaranteed.
+8. Controls are native elements with visible labels, visible focus, and full keyboard operation. The caption text itself is not a live region.
+9. Viewer settings are stored on the viewer's device under one versioned key, validated on every load, and independent of reading speed, pacing and transcription settings.
+10. Approved CSS is limited to these files and selectors, and nothing else:
+    - `caption-overlay.component.css`: the caption band, its layer and position classes, font family classes, and outline and shadow classes.
+    - `caption-preview.component.css`: the preview frame and its positioning context.
+    - `caption-appearance-settings.component.css`: the settings panel layout only.
+    No global stylesheet, theme file or other component's styles may change for this feature.
+
 ## Code comments
 
 - No comments of any kind in TypeScript, HTML or CSS: no `//`, `/* */`, `<!-- -->`, and no `TODO` or `FIXME`.

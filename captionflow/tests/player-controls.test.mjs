@@ -70,7 +70,7 @@ test('shortcutFor maps player keys to actions', () => {
   assert.equal(shortcutFor(key('K')), 'togglePlay');
   assert.equal(shortcutFor(key('r')), 'replay');
   assert.equal(shortcutFor(key('n')), 'next');
-  assert.equal(shortcutFor(key('c')), 'openCaptions');
+  assert.equal(shortcutFor(key('c')), 'toggleCaptions');
   assert.equal(shortcutFor(key('f')), 'fullscreen');
   assert.equal(shortcutFor(key('M')), 'mute');
   assert.equal(shortcutFor(key('ArrowLeft')), 'seekBack');
