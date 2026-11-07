@@ -121,8 +121,8 @@
                     <button id="play" class="bar-btn" type="button" data-state="paused" aria-label="Play" title="Play (Space or K)">
                       <svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z"/></svg><svg class="icon icon-pause" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
                     </button>
-                    <button id="replay" class="bar-btn bar-btn-essential" type="button" aria-label="Replay this caption" title="Replay this caption (R)">
-                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg><span class="bar-text">Replay this caption</span>
+                    <button id="replay" class="bar-btn bar-btn-essential" type="button" aria-label="Replay sentence" title="Replay sentence (R)">
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg><span class="bar-text">Replay sentence</span>
                     </button>
                     <button id="next" class="bar-btn bar-btn-essential" type="button" aria-label="Next caption" title="Next caption (N)">
                       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l8.5 6L6 18zM16 6h2v12h-2z"/></svg><span class="bar-text">Next caption</span>
@@ -135,8 +135,9 @@
                       </button>
                       <ul id="pace-menu" class="pace-menu" role="menu" aria-label="Reading pace" hidden>
                         <li role="none"><button type="button" role="menuitemradio" aria-checked="true" data-pace="normal">Normal</button></li>
-                        <li role="none"><button type="button" role="menuitemradio" aria-checked="false" data-pace="0.5">0.5×</button></li>
-                        <li role="none"><button type="button" role="menuitemradio" aria-checked="false" data-pace="0.75">0.75×</button></li>
+                        <li role="none"><button type="button" role="menuitemradio" aria-checked="false" data-pace="0.25">Extra slow (0.25×)</button></li>
+                        <li role="none"><button type="button" role="menuitemradio" aria-checked="false" data-pace="0.5">Very slow (0.5×)</button></li>
+                        <li role="none"><button type="button" role="menuitemradio" aria-checked="false" data-pace="0.75">Slow (0.75×)</button></li>
                         <li role="none"><button type="button" role="menuitemradio" aria-checked="false" data-pace="1.25">1.25×</button></li>
                         <li role="none"><button type="button" role="menuitemradio" aria-checked="false" data-pace="1.5">1.5×</button></li>
                         <li role="none"><button type="button" role="menuitemradio" aria-checked="false" data-pace="1.75">1.75×</button></li>
@@ -204,7 +205,29 @@
               </div>
               <p id="search-status" class="small" role="status" aria-live="polite"></p>
             </div>
+            <details class="text-ai-options" id="text-ai-options">
+              <summary>Caption language and AI tools</summary>
+              <label for="target-language">Caption display language</label>
+              <select id="target-language" aria-describedby="translation-status">
+                <option value="">Original spoken language</option>
+                <option value="en">English</option>
+                <option value="sw">Kiswahili</option>
+              </select>
+              <label class="consent" for="text-ai-consent">
+                <input id="text-ai-consent" type="checkbox" />
+                I consent to sending the transcript text (not the video) to the configured AI service for translation or key points.
+              </label>
+              <button id="translate" type="button" disabled>Translate captions with AI</button>
+              <p id="translation-status" class="small" role="status" aria-live="polite">Select English or Kiswahili after loading captions.</p>
+              <p class="small">AI translations are unreviewed. Original speech and timestamps remain available.</p>
+            </details>
             <ol id="transcript" class="transcript"></ol>
+            <section class="transcript-summary" aria-labelledby="summary-title">
+              <h4 id="summary-title">Key points from transcript</h4>
+              <button id="summarize" type="button" disabled>Summarize transcript into key points</button>
+              <p id="summary-status" class="small" role="status" aria-live="polite">AI key points will appear here after you request them.</p>
+              <ul id="summary-points" class="summary-points"></ul>
+            </section>
           </section>
         </div>
       </section>

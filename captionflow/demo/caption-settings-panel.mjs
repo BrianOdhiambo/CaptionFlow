@@ -144,8 +144,8 @@ function buildPanel() {
   grid.append(
     size.wrap,
     fieldWithLabel('cs-font', 'Font', view.family).wrap,
-    fieldWithLabel('cs-color-text', 'Text colour', view.color).wrap,
-    fieldWithLabel('cs-color-box', 'Background colour', view.background).wrap,
+    fieldWithLabel('cs-color-text', 'Text color', view.color).wrap,
+    fieldWithLabel('cs-color-box', 'Background color', view.background).wrap,
     opacity.wrap,
     fieldWithLabel('cs-contrast', 'Contrast mode', view.contrast).wrap,
   );
