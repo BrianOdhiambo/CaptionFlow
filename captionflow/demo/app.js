@@ -12,7 +12,7 @@ const ids = ['video', 'video-file', 'video-link', 'load-link', 'link-form', 'emp
   'target-language', 'translation-status',
   'player-bar', 'player-hint', 'play', 'time', 'seek', 'replay', 'next', 'pace-button', 'pace-text', 'pace-menu',
   'speed-slider', 'speed-value', 'speed-down', 'speed-up', 'pause-each-caption', 'cc', 'mute', 'fullscreen',
-  'caption', 'caption-wrap', 'caption-settings-root', 'message'];
+  'caption', 'caption-wrap', 'caption-settings-root', 'message', 'progress-overlay', 'progress-title', 'progress-detail'];
 const els = Object.fromEntries(ids.map(id => [id, byId(id)]));
 let cues = [];
 let payload = null;
@@ -336,6 +336,7 @@ function setCaptions(data) {
 
 function resetToEmpty() {
   videoSelectionVersion++;
+  hideProgress();
   els.video.pause();
   els.video.removeAttribute('src');
   els.video.load();
@@ -359,6 +360,49 @@ function captionProvider() {
   return ['local', 'hosted'].find(name => providerAvailability[name]) ?? null;
 }
 
+let progressTimer = null;
+function showProgress(title, detail = '') {
+  els['progress-title'].textContent = title;
+  els['progress-detail'].textContent = detail;
+  els['progress-overlay'].hidden = false;
+}
+function showElapsed(label) {
+  const started = Date.now();
+  clearInterval(progressTimer);
+  const tick = () => {
+    const seconds = Math.floor((Date.now() - started) / 1000);
+    els['progress-detail'].textContent = `${label} · ${seconds}s so far`;
+  };
+  tick();
+  progressTimer = setInterval(tick, 1000);
+}
+function hideProgress() {
+  clearInterval(progressTimer);
+  progressTimer = null;
+  els['progress-overlay'].hidden = true;
+}
+function sendForCaptions(file, params, onUploaded, onUploading) {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open('POST', `/api/transcribe?${params}`);
+    request.setRequestHeader('Content-Type', file.type || 'video/mp4');
+    request.upload.onprogress = event => {
+      if (!event.lengthComputable) return;
+      onUploading(event.loaded / event.total);
+      if (event.loaded >= event.total) onUploaded();
+    };
+    request.upload.onload = () => onUploaded();
+    request.onload = () => {
+      let data = {};
+      try { data = JSON.parse(request.responseText); } catch { /* keep the empty object */ }
+      if (request.status >= 200 && request.status < 300) resolve(data);
+      else reject(new Error(data.error || `status ${request.status}`));
+    };
+    request.onerror = () => reject(new Error('the connection was lost'));
+    request.send(file);
+  });
+}
+
 async function loadVideo(file) {
   const version = ++videoSelectionVersion;
   if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -379,19 +423,36 @@ async function loadVideo(file) {
     message('Captions are not available on this server. The video will play without captions.');
     return;
   }
-  message('Creating captions. This can take a minute for a longer video.');
+  message('Creating captions for this video.');
+  showProgress('Uploading video…', '0%');
+  let switched = false;
+  const onUploaded = () => {
+    if (switched || version !== videoSelectionVersion) return;
+    switched = true;
+    showProgress('Generating captions…');
+    showElapsed('This can take a minute for a longer video');
+    els.transcript.replaceChildren();
+    els['translation-status'].textContent = 'Captions are being generated. They will appear here.';
+  };
+  let sawUploadProgress = false;
+  const onUploading = fraction => {
+    sawUploadProgress = true;
+    if (!switched && version === videoSelectionVersion) els['progress-detail'].textContent = `${Math.round(fraction * 100)}%`;
+  };
+  setTimeout(() => { if (!sawUploadProgress) onUploaded(); }, 2000);
   try {
     const params = new URLSearchParams({ provider, language: 'auto', mode: 'original', consent: provider === 'hosted' ? 'yes' : 'no' });
-    const response = await fetch(`/api/transcribe?${params}`, {
-      method: 'POST', headers: { 'Content-Type': file.type || 'video/mp4' }, body: file,
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || `status ${response.status}`);
+    const data = await sendForCaptions(file, params, onUploaded, onUploading);
     if (version !== videoSelectionVersion) return;
     setCaptions(data);
     message(`Captions ready: ${cues.length} lines. Press play.`);
   } catch (error) {
-    if (version === videoSelectionVersion) message(`Could not create captions: ${error.message}`);
+    if (version === videoSelectionVersion) {
+      message(`Could not create captions: ${error.message}`);
+      els['translation-status'].textContent = 'Captions could not be created for this video.';
+    }
+  } finally {
+    if (version === videoSelectionVersion) hideProgress();
   }
 }
 
@@ -399,7 +460,7 @@ async function loadLink(event) {
   event.preventDefault();
   const url = els['video-link'].value.trim();
   if (!url) { message('Paste a link to a video first.'); return; }
-  message('Downloading the video from the link.');
+  showProgress('Downloading the video…', 'from the link you pasted');
   try {
     const response = await fetch('/api/fetch-link', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }),
@@ -414,6 +475,8 @@ async function loadLink(event) {
     await loadVideo(new File([blob], name, { type: blob.type }));
   } catch (error) {
     message(`Could not load the link: ${error.message}`);
+  } finally {
+    hideProgress();
   }
 }
 
