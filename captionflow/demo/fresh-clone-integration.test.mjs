@@ -24,7 +24,7 @@ test('caption settings panel uses teammate port and has apply/cancel and color c
   const [panel, server] = await Promise.all([load('./caption-settings-panel.mjs'), load('./server.mjs')]);
   assert.match(panel, /registerCaptionSettingsPanel/);
   assert.match(panel, /applyAndClose/);
-  assert.match(panel, /cancelAndClose/);
+  assert.match(panel, /dismissAndClose/);
   assert.match(panel, /Text color/);
   assert.match(panel, /Background color/);
   assert.match(server, /'\/caption-settings-panel\.mjs'/);

@@ -86,12 +86,18 @@ export function createCaptionSettingsPort({ captionWrap, mount, fetch: fetchImpl
       return result;
     },
 
-    /** X or Esc: put back the style from when the panel opened. Nothing is saved. */
+    /** Esc: put back the style from when the panel opened. Nothing is saved. */
     async cancelAndClose() {
       if (!activePanel) return;
       style = styleAtOpen;
       render();
       close('cancel');
+    },
+
+    /** X: close and keep the look chosen in this visit. Nothing is saved. */
+    dismissAndClose() {
+      if (!activePanel) return;
+      close('dismiss');
     },
 
     getCaptionStyle() { return { ...style }; },
@@ -151,8 +157,10 @@ export function setCaptionStyle(partialStyle) { connected().setCaptionStyle(part
 export function resetCaptionStyle() { connected().resetCaptionStyle(); }
 // Apply: keep and save. Esc is handled by the player and behaves like cancelAndClose().
 export function applyAndClose() { return connected().applyAndClose(); }
-// X: revert to the style at open.
+// Esc: revert to the style at open.
 export function cancelAndClose() { return connected().cancelAndClose(); }
+// X: close and keep the look chosen in this visit; nothing is saved.
+export function dismissAndClose() { connected().dismissAndClose(); }
 // Player-only, used by the CC button and by tests.
 export function getCaptionStyle() { return port ? port.getCaptionStyle() : { ...DEFAULT_CAPTION_STYLE }; }
 export function setCaptionsVisible(visible) { connected().setCaptionsVisible(visible); }

@@ -1,6 +1,6 @@
 import {
   applyAndClose,
-  cancelAndClose,
+  dismissAndClose,
   getCaptionStyle,
   registerCaptionSettingsPanel,
   resetCaptionStyle,
@@ -107,7 +107,7 @@ function buildPanel() {
   const close = pressableButton('cs-icon', 'Close caption settings');
   close.removeAttribute('aria-pressed');
   close.textContent = '✕';
-  close.addEventListener('click', () => cancelAndClose());
+  close.addEventListener('click', () => dismissAndClose());
   header.append(title, close);
 
   const fontSection = element('div', 'cs-section');
