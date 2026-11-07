@@ -7,6 +7,18 @@ import { isIP } from 'node:net';
 
 export const SUPPORTED_VIDEO_TYPES = Object.freeze(['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-m4v']);
 const MAX_REDIRECTS = 3;
+const GENERIC_TYPES = Object.freeze(['application/octet-stream', 'binary/octet-stream', 'application/download', 'application/x-download', '']);
+const EXTENSION_TYPES = Object.freeze({ mp4: 'video/mp4', m4v: 'video/x-m4v', webm: 'video/webm', ogv: 'video/ogg', ogg: 'video/ogg', mov: 'video/quicktime' });
+const NOT_A_VIDEO = 'The link opens a web page, not a video file. Open the video itself and copy the address of the video file (it usually ends in .mp4 or .webm).';
+
+function videoTypeFromPath(url) {
+  const extension = url.pathname.split('.').pop()?.toLowerCase();
+  return EXTENSION_TYPES[extension] ?? null;
+}
+
+function megabytes(bytes) {
+  return `${Math.round(bytes / (1024 * 1024))} MB`;
+}
 
 export class LinkError extends Error {
   constructor(status, message) {
@@ -53,12 +65,12 @@ export async function validatePublicUrl(input, { lookup = dnsLookup } = {}) {
 
 async function readLimited(response, maxBytes) {
   const declared = Number(response.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > maxBytes) throw new LinkError(413, 'Video exceeds the size limit');
+  if (Number.isFinite(declared) && declared > maxBytes) throw new LinkError(413, `The video is larger than the ${megabytes(maxBytes)} limit`);
   const chunks = [];
   let total = 0;
   for await (const chunk of response.body) {
     total += chunk.length;
-    if (total > maxBytes) throw new LinkError(413, 'Video exceeds the size limit');
+    if (total > maxBytes) throw new LinkError(413, `The video is larger than the ${megabytes(maxBytes)} limit`);
     chunks.push(chunk);
   }
   if (!total) throw new LinkError(400, 'The link did not return any video');
@@ -72,17 +84,21 @@ export async function fetchVideoLink(input, { maxBytes, fetchImpl = fetch, looku
     let response;
     try {
       response = await fetchImpl(current, { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
-    } catch {
-      throw new LinkError(502, 'The link could not be downloaded');
+    } catch (error) {
+      const timedOut = error?.name === 'TimeoutError' || error?.name === 'AbortError';
+      throw new LinkError(502, timedOut ? 'The link took too long to download' : 'The link could not be downloaded. Check that it is public and try again');
     }
     if (response.status >= 300 && response.status < 400 && response.headers.get('location')) {
       current = await validatePublicUrl(new URL(response.headers.get('location'), current).href, { lookup });
       continue;
     }
-    if (!response.ok) throw new LinkError(502, `The link returned status ${response.status}`);
-    const contentType = (response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
-    if (!SUPPORTED_VIDEO_TYPES.includes(contentType)) {
-      throw new LinkError(415, 'The link is not a direct video file (MP4, WebM, Ogg or QuickTime)');
+    if (!response.ok) throw new LinkError(502, `The link returned an error (status ${response.status}). Check the address and that the video is public`);
+    const declaredType = (response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    const pathType = videoTypeFromPath(current);
+    const contentType = SUPPORTED_VIDEO_TYPES.includes(declaredType) ? declaredType
+      : (GENERIC_TYPES.includes(declaredType) && pathType) ? pathType : null;
+    if (!contentType) {
+      throw new LinkError(415, declaredType.startsWith('text/') || declaredType === 'application/json' || !declaredType ? NOT_A_VIDEO : `This link gives a ${declaredType} file, not a video. Use MP4, WebM, Ogg or QuickTime.`);
     }
     return { bytes: await readLimited(response, maxBytes), contentType };
   }
