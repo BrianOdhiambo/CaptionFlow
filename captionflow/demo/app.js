@@ -11,7 +11,7 @@ const ids = ['video', 'video-file', 'video-link', 'load-link', 'link-form', 'emp
   'follow', 'show-times', 'transcript-size', 'download-transcript', 'transcript-search', 'search-prev', 'search-next', 'search-status',
   'target-language', 'translation-status',
   'player-bar', 'player-hint', 'play', 'time', 'seek', 'replay', 'next', 'pace-button', 'pace-text', 'pace-menu',
-  'speed-slider', 'speed-value', 'speed-down', 'speed-up', 'pause-each-caption', 'cc', 'caption-settings-button', 'mute', 'fullscreen',
+  'speed-slider', 'speed-value', 'speed-down', 'speed-up', 'pause-each-caption', 'cc', 'caption-settings-button', 'language-button', 'mute', 'fullscreen',
   'caption', 'caption-wrap', 'caption-settings-root', 'message', 'progress-overlay', 'progress-title', 'progress-detail'];
 const els = Object.fromEntries(ids.map(id => [id, byId(id)]));
 let cues = [];
@@ -226,6 +226,7 @@ function displayLanguage() {
 
 function updateTextActions() {
   els['target-language'].disabled = !payload?.transcript?.segments?.length || isTranslating;
+  if (els['language-button']) els['language-button'].disabled = els['target-language'].disabled;
 }
 
 function clearTranscript() {
@@ -508,7 +509,21 @@ els['video-file'].addEventListener('change', () => {
   if (file) loadVideo(file);
 });
 els['link-form'].addEventListener('submit', loadLink);
-els['target-language'].addEventListener('change', translateSelected);
+els['target-language'].addEventListener('change', () => { translateSelected(); showLanguageButton(); });
+const LANGUAGE_CYCLE = ['', 'en', 'sw'];
+const LANGUAGE_LABELS = { '': 'original', en: 'English', sw: 'Kiswahili' };
+const LANGUAGE_SHORT = { '': 'Orig', en: 'EN', sw: 'SW' };
+function showLanguageButton() {
+  const value = els['target-language'].value;
+  els['language-button'].textContent = LANGUAGE_SHORT[value] ?? 'Orig';
+  els['language-button'].setAttribute('aria-label', `Caption language: ${LANGUAGE_LABELS[value] ?? 'original'}. Switch language`);
+  els['language-button'].disabled = els['target-language'].disabled;
+}
+els['language-button'].addEventListener('click', () => {
+  const index = LANGUAGE_CYCLE.indexOf(els['target-language'].value);
+  els['target-language'].value = LANGUAGE_CYCLE[(index + 1) % LANGUAGE_CYCLE.length];
+  els['target-language'].dispatchEvent(new Event('change'));
+});
 els['transcript-size'].addEventListener('change', () => { els.transcript.dataset.size = els['transcript-size'].value; });
 els['show-times'].addEventListener('change', () => els.transcript.classList.toggle('hide-times', !els['show-times'].checked));
 els['transcript-search'].addEventListener('input', applySearch);
