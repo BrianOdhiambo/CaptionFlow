@@ -1,4 +1,4 @@
-import { selectActiveCue, nextCue, sentenceReplayRange } from '/player-sync.mjs';
+import { selectActiveCue, nextCue, replayCue } from '/player-sync.mjs';
 import { viewCaptionsForMode } from '/caption-view.mjs';
 import { HIDE_CONTROLS_AFTER_MS, shouldHideControls, shortcutFor, cueLabel } from '/player-controls.mjs';
 import { connectCaptionSettingsPort } from '/caption-settings-port.mjs';
@@ -6,8 +6,8 @@ import '/caption-settings-panel.mjs';
 
 const byId = id => document.getElementById(id);
 const ids = ['video','video-file','caption-file','caption','caption-wrap','language','mode','replay','next','transcript','message','time-status','provider','generate','provider-note','hosted-consent-wrap','hosted-consent','download-json','download-transcript','demo-warning','caption-status',
-  'video-shell','player-bar','player-hint','play','time','seek','pace-button','pace-text','pace-menu','cc','mute','fullscreen','caption-settings-root',
-  'follow','show-times','transcript-size','transcript-search','search-prev','search-next','search-status','target-language','translate','translation-status','text-ai-consent','summarize','summary-status','summary-points'];
+  'video-shell','player-bar','player-hint','play','time','seek','pace-button','pace-text','pace-menu','transcript-toggle','watch-layout','transcript-panel','summarise-transcript','cc','mute','fullscreen','caption-settings-root',
+  'transcript-options-button','transcript-options','follow','show-times','transcript-size','transcript-search','search-prev','search-next','search-status','target-language','translate','translation-status','text-ai-consent','summarize','summary-status','summary-points','summary-section'];
 const els = Object.fromEntries(ids.map(id => [id, byId(id)]));
 let cues = [];
 let payload = null;
@@ -15,7 +15,6 @@ let source = 'fixture';  // fixture | generated | external
 let currentCueId = null;
 let lastManualPausedId = null;
 let skipManualPauseForCueId = null;
-let sentenceReplayUntil = null;
 let isTranslating = false;
 let isSummarizing = false;
 let textAIAvailable = false;
@@ -23,7 +22,7 @@ let videoSelectionVersion = 0;
 let isGenerating = false;
 let objectUrl = null;
 let providerAvailability = { fixture: true, local: true, hosted: false };
-let pace = 'normal';  // normal | slow | manual
+let pace = 'normal';  // normal | slow | 0.5 | 0.25 | manual
 let matchIds = [];
 let matchIndex = -1;
 const timeLabel = t => `${Math.floor(t/60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
@@ -176,8 +175,7 @@ function transcriptText() {
 
 function sync() {
   const cue = selectActiveCue(cues, els.video.currentTime || 0);
-  if (sentenceReplayUntil && (els.video.currentTime >= sentenceReplayUntil.end - 0.05 || els.video.currentTime < sentenceReplayUntil.start - 0.2)) sentenceReplayUntil = null;
-  els.caption.textContent = cue?.displayText ?? (cues.length ? ' ' :
+  els.caption.textContent = cue?.displayText ?? (cues.length ? '' :
     (els['video-file'].files?.length ? 'Captions not loaded yet' : 'Choose a video to begin.'));
   if (skipManualPauseForCueId && cue?.id !== skipManualPauseForCueId) {
     skipManualPauseForCueId = null;
@@ -196,7 +194,7 @@ function sync() {
   els['time-status'].textContent = `Playback position: ${timeLabel(els.video.currentTime || 0)}${label ? ` · ${label}` : ''}`;
   updateTime();
   if (cue && pace === 'manual' && !els.video.paused &&
-      cue.id !== lastManualPausedId && cue.id !== skipManualPauseForCueId && !sentenceReplayUntil &&
+      cue.id !== lastManualPausedId && cue.id !== skipManualPauseForCueId &&
       els.video.currentTime >= cue.start + 0.06) {
     lastManualPausedId = cue.id;
     els.video.pause();
@@ -212,7 +210,6 @@ function setCaptions(data, nextSource) {
   currentCueId = null;
   lastManualPausedId = null;
   skipManualPauseForCueId = null;
-  sentenceReplayUntil = null;
   renderTranscript();
   sync();
   els['download-json'].disabled = false;
@@ -230,6 +227,7 @@ function updateTextActions() {
   const ready = Boolean(payload?.transcript?.segments?.length) && source !== 'fixture';
   els.translate.disabled = !ready || !textAIAvailable || isTranslating;
   els.summarize.disabled = !ready || !textAIAvailable || isSummarizing;
+  els['summarise-transcript'].disabled = els.summarize.disabled;
 
 }
 function showCachedSummary() {
@@ -287,7 +285,6 @@ async function loadDemoCues() {
 function applyPace() {
   els.video.playbackRate = pace === 'slow' ? 0.75 : (['0.5','0.25'].includes(pace) ? Number(pace) : 1);
   lastManualPausedId = null;
-  sentenceReplayUntil = null;
   sync();
 }
 function updateProviderUI() {
@@ -310,7 +307,7 @@ els['video-file'].addEventListener('change', () => {
     objectUrl = null;
     els.video.removeAttribute('src');
     els.video.load();
-    cues = []; payload = null; currentCueId = null; sentenceReplayUntil = null;
+    cues = []; payload = null; currentCueId = null;
     clearTextOutputs();
     els.transcript.replaceChildren();
     els.caption.textContent = 'Choose a video to begin.';
@@ -324,7 +321,7 @@ els['video-file'].addEventListener('change', () => {
   els.video.load();
   // Never show unrelated fixture captions against a new video automatically.
   cues = []; payload = null; source = 'external'; currentCueId = null;
-  skipManualPauseForCueId = null; lastManualPausedId = null; sentenceReplayUntil = null;
+  skipManualPauseForCueId = null; lastManualPausedId = null;
   els.transcript.replaceChildren();
   els.caption.textContent = 'No captions yet';
   els.replay.disabled = true; els.next.disabled = true;
@@ -422,24 +419,52 @@ els['download-transcript'].addEventListener('click', () => {
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
+function openTranscriptOptions() {
+  els['transcript-options'].hidden = false;
+  els['transcript-options-button'].setAttribute('aria-expanded', 'true');
+  els.follow.focus();
+}
+function closeTranscriptOptions({ focusButton = false } = {}) {
+  if (els['transcript-options'].hidden) return;
+  els['transcript-options'].hidden = true;
+  els['transcript-options-button'].setAttribute('aria-expanded', 'false');
+  if (focusButton) els['transcript-options-button'].focus();
+}
+els['transcript-options-button'].addEventListener('click', () => {
+  if (els['transcript-options'].hidden) openTranscriptOptions(); else closeTranscriptOptions();
+});
+els['transcript-options'].addEventListener('keydown', event => {
+  if (event.key !== 'Escape') return;
+  event.preventDefault();
+  closeTranscriptOptions({ focusButton: true });
+});
+els['transcript-options'].addEventListener('focusout', event => {
+  if (event.relatedTarget && !els['transcript-options-button'].parentElement.contains(event.relatedTarget)) closeTranscriptOptions();
+});
+document.addEventListener('pointerdown', event => {
+  if (!els['transcript-options-button'].parentElement.contains(event.target)) closeTranscriptOptions();
+});
+// The ⋮ item runs the same summary as the Summarize button and moves focus to its results.
+els['summarise-transcript'].addEventListener('click', () => {
+  closeTranscriptOptions();
+  if (!els['text-ai-consent'].checked) byId('text-ai-options').open = true;
+  els['summary-section'].scrollIntoView({ block: 'nearest' });
+  els.summarize.focus();
+  els.summarize.click();
+});
 function replay() {
-  const range = sentenceReplayRange(payload?.transcript?.segments ?? cues, els.video.currentTime);
-  if (!range) { message('No sentence is available to replay at this position.'); return; }
-  // Keep playback continuous across short cues in manual pace mode.
-  sentenceReplayUntil = { start: range.startCue.start, end: range.endCue.end };
-  skipManualPauseForCueId = range.startCue.id;
-  lastManualPausedId = null;
-  els.video.currentTime = range.startCue.start;
+  const cue = replayCue(cues, els.video.currentTime);
+  if (!cue) { message('There is no previous caption to replay at this position.'); return; }
+  // Do not immediately auto-pause again at the start of a manually replayed cue.
+  skipManualPauseForCueId = cue.id;
+  els.video.currentTime = cue.start;
   sync();
   els.video.play().then(
-    () => message(range.usedSentenceBoundary
-      ? `Replaying sentence from ${timeLabel(range.startCue.start)}.`
-      : `Replaying nearby context from ${timeLabel(range.startCue.start)} (no clear full stop found).`),
-    error => { sentenceReplayUntil = null; message(`Unable to resume playback: ${error.message}`); },
+    () => message(`Replaying ${cueLabel(cues, cue).toLowerCase()}.`),
+    error => message(`Unable to resume playback: ${error.message}`),
   );
 }
 function next() {
-  sentenceReplayUntil = null;
   const cue = nextCue(cues, els.video.currentTime);
   if (cue) {
     els.video.currentTime = cue.start;
@@ -660,6 +685,20 @@ document.addEventListener('pointerdown', event => {
   if (!els['pace-menu'].hidden && !els['pace-button'].parentElement.contains(event.target)) closePaceMenu();
 });
 
+const TRANSCRIPT_VISIBLE_KEY = 'captionflow.transcriptVisible';
+function setTranscriptVisible(visible) {
+  els['transcript-panel'].hidden = !visible;
+  els['watch-layout'].classList.toggle('transcript-hidden', !visible);
+  els['transcript-toggle'].setAttribute('aria-pressed', String(visible));
+  els['transcript-toggle'].title = visible ? 'Hide transcript' : 'Show transcript';
+  try { browserStorage()?.setItem(TRANSCRIPT_VISIBLE_KEY, String(visible)); } catch {}
+  if (visible) followActiveLine();
+}
+els['transcript-toggle'].addEventListener('click', () => {
+  setTranscriptVisible(els['transcript-panel'].hidden);
+  noteActivity();
+});
+
 // Shown in the settings mount until the caption settings panel registers.
 function createPlaceholderPanel() {
   return {
@@ -762,6 +801,7 @@ if ('ResizeObserver' in window) {
 updatePlayButton();
 updateMuteButton();
 updateTime();
+setTranscriptVisible((() => { try { return browserStorage()?.getItem(TRANSCRIPT_VISIBLE_KEY) !== 'false'; } catch { return true; } })());
 
 els.video.addEventListener('timeupdate', sync);
 els.video.addEventListener('seeking', sync);

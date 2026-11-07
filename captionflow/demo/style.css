@@ -47,7 +47,7 @@ h1 {
 }
 
 main {
-    max-width: 1100px;
+    max-width: 1280px;
     margin: 24px auto;
     padding: 0 22px
 }
@@ -158,11 +158,9 @@ video {
     pointer-events: none;
     position: absolute;
     bottom: 16px;
-    left: 5%;
-    right: 5%;
+    left: 10%;
+    right: 10%;
     text-align: center;
-    display: flex;
-    justify-content: center;
     transition: bottom .2s ease
 }
 
@@ -175,25 +173,34 @@ video {
     display: none
 }
 
-/* Caption style comes from CSS variables set by the caption settings port. */
+/* Caption style comes from CSS variables set by the caption settings port.
+ * Inline with a cloned box per line, like YouTube: each wrapped line gets its
+ * own background instead of one large block. Size follows the player width
+ * (#video-shell is the player-shell container). */
 .caption-wrap>div {
+    display: inline;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
     background: rgba(0, 0, 0, .87);
     background: color-mix(in srgb, var(--caption-bg, #000000) calc(var(--caption-bg-opacity, .87) * 100%), transparent);
     color: var(--caption-color, #ffffff);
     font-family: var(--caption-font, inherit);
-    font-weight: 650;
-    line-height: 1.4;
-    font-size: calc(1.25rem * var(--caption-scale, 1));
-    padding: 10px 16px;
-    border-radius: 7px;
-    max-width: 100%;
+    font-weight: 500;
+    line-height: 1.5;
+    font-size: calc(clamp(1rem, 2.6cqi, 2rem) * var(--caption-scale, 1));
+    padding: .1em .4em;
+    border-radius: 3px;
     overflow-wrap: anywhere
+}
+
+.caption-wrap>div:empty {
+    display: none
 }
 
 .caption-wrap.contrast-high>div {
     background: var(--caption-bg, #000000);
-    outline: 2px solid var(--caption-color, #ffffff);
-    font-weight: 800
+    box-shadow: 0 0 0 2px var(--caption-color, #ffffff);
+    font-weight: 700
 }
 
 .caption-wrap.contrast-inverted>div {
@@ -201,7 +208,8 @@ video {
     color: var(--caption-bg, #000000)
 }
 
-/* In-player control bar */
+/* In-player control bar, shaped like YouTube's: a full-width seek row on
+ * top, then one row of buttons with the time in the left group. */
 .player-bar {
     position: absolute;
     left: 0;
@@ -209,13 +217,14 @@ video {
     bottom: 0;
     z-index: 2;
     display: grid;
-    grid-template-columns: auto auto minmax(80px, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-        "hint hint hint hint"
-        "left time seek right";
+        "hint"
+        "seek"
+        "buttons";
     align-items: center;
-    gap: 4px 10px;
-    padding: 20px 10px 8px;
+    gap: 0;
+    padding: 12px 8px 4px;
     background: linear-gradient(rgba(6, 9, 13, 0), rgba(6, 9, 13, .92) 35%);
     color: #fff;
     transition: opacity .2s ease, transform .2s ease
@@ -229,39 +238,6 @@ video {
 
 .video-shell:not(.controls-visible) video {
     cursor: none
-}
-
-/* Below this player width, the bar's button text no longer fits one row;
- * without this, the right-hand buttons (CC, Mute, Full screen) overflow
- * #video-shell's `overflow: hidden` and become invisible and unclickable.
- * Names stay for screen readers via aria-label. A container query, not a
- * viewport one: the transcript panel's two-column layout keeps #video-shell
- * well under the viewport width on most desktop windows. Replay/Next
- * (.bar-btn-essential) are core accessibility controls, not conveniences:
- * their text label never collapses, at any width. */
-@container player-shell (max-width: 760px) {
-    .bar-btn:not(.bar-btn-essential) .bar-text {
-        display: none
-    }
-
-    .bar-btn {
-        padding: 6px
-    }
-
-    .bar-group {
-        gap: 0
-    }
-
-    .player-bar {
-        grid-template-columns: minmax(0, 1fr) auto;
-        grid-template-areas:
-            "hint hint"
-            "seek time"
-            "buttons buttons";
-        gap: 4px 6px;
-        padding: 16px 6px 6px
-    }
-
 }
 
 .player-hint {
@@ -280,58 +256,33 @@ video {
     display: none
 }
 
+/* Play/Replay/Next/time (bar-left) and Pace/CC/Mute/Full screen (bar-right).
+ * Replay/Next's text never collapses (core accessibility controls), so on a
+ * narrow player the two groups can need more than one row: flex-wrap lets
+ * bar-right spill onto a second row instead of overlapping bar-left and
+ * swallowing its clicks. */
+.bar-buttons {
+    grid-area: buttons;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0 8px
+}
+
 .bar-group {
     display: flex;
     flex-wrap: wrap;
-    justify-content: center;
     align-items: center;
     gap: 4px
 }
 
-/* Invisible by default: .bar-left/.bar-right stay direct grid items of
- * .player-bar, placed by their own grid-area. Overridden to a real flex
- * row only at the narrowest player widths (see the container query below),
- * so the two groups wrap onto their own row instead of overlapping when
- * there isn't room for both on one line. */
-.bar-buttons {
-    display: contents
-}
-
-/* Play/Replay/Next (bar-left) and Pace/CC/Mute/Full screen (bar-right)
- * share one row below 760px, but Replay/Next's text never collapses (see
- * above), so the two groups can together need more than that row's width.
- * flex-wrap lets them spill onto a second row instead of overlapping (the
- * group painted later, bar-right, would otherwise silently swallow clicks
- * meant for bar-left, e.g. Next). Wraps only when actually needed, at any
- * container width. Positioned after the base `.bar-buttons` rule above so
- * it wins the cascade when its condition matches: two rules of equal
- * specificity, and a container query's condition matching doesn't add any. */
-@container player-shell (max-width: 760px) {
-    .bar-buttons {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: space-between;
-        align-items: center;
-        gap: 4px 8px;
-        grid-area: buttons
-    }
-
-    .pace-menu {
-        right: -96px
-    }
-}
-
-.bar-left {
-    grid-area: left
-}
-
 .bar-right {
-    grid-area: right;
-    justify-self: end
+    margin-left: auto
 }
 
 .bar-time {
-    grid-area: time;
+    margin: 0 6px;
     font-variant-numeric: tabular-nums;
     font-weight: 600;
     white-space: nowrap
@@ -369,8 +320,32 @@ video {
     display: none
 }
 
-.bar-btn[aria-expanded=true] {
+.bar-btn[aria-expanded=true],
+.bar-btn[aria-pressed=true] {
     background: rgba(255, 255, 255, .22)
+}
+
+/* Below this player width, the Pace text no longer fits. Names stay for
+ * screen readers via aria-label. A container query, not a viewport one: the
+ * two-column watch layout keeps #video-shell well under the viewport width.
+ * Positioned after the base bar rules so it wins the cascade when it
+ * matches (equal specificity; a matching condition adds none). */
+@container player-shell (max-width: 880px) {
+    .bar-btn:not(.bar-btn-essential) .bar-text {
+        display: none
+    }
+
+    .bar-btn {
+        padding: 6px
+    }
+
+    .bar-group {
+        gap: 0
+    }
+
+    .player-bar {
+        padding: 10px 6px 4px
+    }
 }
 
 .icon {
@@ -431,6 +406,21 @@ video {
     content: "✓";
     position: absolute;
     left: 12px
+}
+
+/* On a small player the Pace button can wrap to the left of the bar, and the
+ * wrapped bar leaves no room above it, so a menu anchored above the button
+ * would run off the player. Overlay it on the bar's bottom-right corner
+ * instead (.player-bar is the nearest positioned ancestor). */
+@container player-shell (max-width: 480px) {
+    .pace-wrap {
+        position: static
+    }
+
+    .pace-menu {
+        right: 8px;
+        bottom: 8px
+    }
 }
 
 /* The caption settings panel renders inside this mount; it stays in full screen. */
@@ -507,54 +497,6 @@ video {
     margin-top: 14px
 }
 
-.transcript {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    max-height: 350px;
-    overflow: auto
-}
-
-.transcript li {
-    border-bottom: 1px solid #e7eef3
-}
-
-.transcript button {
-    display: block;
-    width: 100%;
-    background: transparent;
-    border: 0;
-    text-align: left;
-    border-radius: 4px;
-    line-height: 1.6;
-    padding: 11px
-}
-
-.transcript button:hover,
-.transcript .active button {
-    background: #dcecf6
-}
-
-.transcript .active {
-    border-left: 4px solid #136b9f
-}
-
-.time {
-    display: inline-block;
-    font-variant-numeric: tabular-nums;
-    font-weight: 700;
-    color: #254b6c;
-    min-width: 72px
-}
-
-.flag {
-    font-size: .8rem;
-    background: #fff1d6;
-    padding: 2px 6px;
-    border-radius: 4px;
-    color: #754407
-}
-
 .message {
     color: #264d65;
     font-weight: 600;
@@ -594,10 +536,6 @@ footer {
     .caption-wrap {
         left: 3%;
         right: 3%
-    }
-
-    .caption-wrap>div {
-        padding: 7px 10px
     }
 
     h1 {
@@ -660,6 +598,21 @@ button:disabled {
     font-size: .93rem;
 }
 
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0
+}
+
+/* Watch page, shaped like YouTube's: the player column first, the transcript
+ * in a fixed-width column beside it at wide widths, stacked below it on
+ * narrower ones. */
 .watch-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -672,17 +625,199 @@ button:disabled {
     min-width: 0
 }
 
-.transcript-panel h3 {
-    margin: 0 0 6px;
+.transcript-panel {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #dbe4eb;
+    border-radius: 12px
+}
+
+.transcript-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 6px 6px 16px;
+    border-bottom: 1px solid #e7eef3
+}
+
+.transcript-header h3 {
+    margin: 0;
     font-size: 1.05rem
 }
 
-.transcript-tools {
-    margin: 8px 0 12px
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 6px;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    background: transparent;
+    color: #254b6c
+}
+
+.icon-btn:hover {
+    background: #e6f1f8
+}
+
+.icon-btn[aria-expanded=true] {
+    background: #dcecf6
+}
+
+.transcript-options-wrap {
+    position: relative
+}
+
+.transcript-options {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 240px;
+    padding: 8px;
+    background: white;
+    border: 1px solid #dbe4eb;
+    border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(18, 39, 57, .18)
+}
+
+.transcript-options[hidden] {
+    display: none
+}
+
+.transcript-options label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 0 8px;
+    border-radius: 6px;
+    font-weight: 600
+}
+
+.transcript-options label:hover {
+    background: #f1f6fa
+}
+
+.transcript-options .option-select {
+    justify-content: space-between
+}
+
+.transcript-options select {
+    padding: 6px 8px
+}
+
+.transcript-search {
+    padding: 10px 12px 0
+}
+
+.search-row {
+    display: flex;
+    align-items: center;
+    gap: 2px
+}
+
+.search-row input[type=search] {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    margin-right: 4px;
+    border: 1px solid #aebdc9;
+    border-radius: 22px;
+    padding: 8px 16px;
+    background: white;
+    color: #1b3043
+}
+
+.search-status {
+    margin: 4px 4px 0;
+    line-height: 1.4
+}
+
+.search-status:empty {
+    display: none
 }
 
 .transcript {
-    position: relative
+    position: relative;
+    margin: 8px 0 0;
+    padding: 0 6px;
+    list-style: none;
+    max-height: 350px;
+    overflow: auto
+}
+
+/* One line: the time as a small chip in its own column, the text (and any
+ * review flag) wrapping in the column beside it. */
+.transcript button {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 2px 12px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    border-left: 3px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    font-weight: 400;
+    line-height: 1.5;
+    text-align: left
+}
+
+.transcript button:hover {
+    background: #f1f6fa
+}
+
+.transcript .active button {
+    background: #e3f0f8;
+    border-left-color: #136b9f
+}
+
+.time {
+    grid-column: 1;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #eef3f7;
+    color: #3d5a73;
+    font-size: .8rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.6
+}
+
+.line-text {
+    grid-column: 2
+}
+
+.flag {
+    grid-column: 2;
+    justify-self: start;
+    font-size: .75rem;
+    font-weight: 600;
+    background: #fff1d6;
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: #754407
+}
+
+.transcript.hide-times button {
+    grid-template-columns: minmax(0, 1fr)
+}
+
+.transcript.hide-times .time {
+    display: none
+}
+
+.transcript.hide-times .line-text,
+.transcript.hide-times .flag {
+    grid-column: 1
 }
 
 .transcript[data-size=large] button {
@@ -693,37 +828,6 @@ button:disabled {
     font-size: 1.35rem
 }
 
-.transcript.hide-times .time {
-    display: none
-}
-
-.transcript [aria-current=true] {
-    font-weight: 700
-}
-
-.transcript-search {
-    margin-bottom: 10px
-}
-
-.transcript-search label {
-    display: block;
-    font-weight: 600;
-    margin-bottom: 6px
-}
-
-.transcript-search input[type=search] {
-    width: 100%;
-    border: 1px solid #aebdc9;
-    border-radius: 8px;
-    padding: 10px;
-    background: white;
-    color: #1b3043
-}
-
-.transcript-search .actions {
-    margin-top: 8px
-}
-
 .transcript mark {
     background: #ffe38a;
     color: #13263a;
@@ -732,20 +836,45 @@ button:disabled {
 }
 
 .transcript .match button {
-    border-left: 3px solid #df8f2a
+    border-left-color: #df8f2a
 }
 
 .transcript .match-current button {
     background: #fff1d6
 }
 
+.transcript-note {
+    margin: 0;
+    padding: 8px 16px 10px;
+    border-top: 1px solid #e7eef3;
+    font-size: .8rem;
+    line-height: 1.4
+}
+
+/* Transcript shown: the player takes 2/3 of the width and the transcript 1/3.
+ * The panel's own size is contained, so the player column alone sets the
+ * row's height and the panel stretches to match it; the line list fills the
+ * rest. Hidden (.transcript-hidden, panel [hidden]): one column, the player
+ * fills the width. Below 900px a 1/3 column is too narrow to read, so the
+ * shown transcript stacks under the player instead. */
+.transcript-panel[hidden] {
+    display: none
+}
+
 @media(min-width:900px) {
-    .watch-layout {
-        grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr)
+    .watch-layout:not(.transcript-hidden) {
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+        align-items: stretch
     }
 
-    .transcript {
-        max-height: 460px
+    .watch-layout:not(.transcript-hidden) .transcript-panel {
+        overflow-y: auto
+    }
+
+    .watch-layout:not(.transcript-hidden) .transcript {
+        flex: 1;
+        min-height: 0;
+        max-height: none
     }
 }
 /* AI translation and key points integrated into the existing transcript sidebar. */
