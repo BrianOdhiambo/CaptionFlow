@@ -1318,31 +1318,31 @@ button:disabled {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-top: 12px;
-    padding: 12px 16px;
-    border-radius: 12px;
+    margin-top: 6px;
+    padding: 6px 10px;
+    border-radius: 8px;
     background: #0b0f14;
     color: #f1f5f9
 }
 
 .brand-logo {
-    width: 24px;
-    height: 24px;
+    width: 14px;
+    height: 14px;
     fill: #22c55e
 }
 
 .brand-name {
-    font-size: 1.05rem;
+    font-size: .8rem;
     font-weight: 800
 }
 
 .brand-divider {
     width: 1px;
-    height: 18px;
+    height: 12px;
     background: #374151
 }
 
 .brand-tagline {
-    color: #cbd5e1;
-    font-size: .9rem
+    color: #94a3b8;
+    font-size: .72rem
 }
