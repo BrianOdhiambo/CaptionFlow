@@ -214,6 +214,7 @@ function applyGeneratedMode() {
   }
 }
 
+const LANGUAGE_NAMES = { en: 'English', sw: 'Kiswahili' };
 function displayLanguage() {
   return els['target-language'].value || payload?.sourceLanguage || 'en';
 }
@@ -254,6 +255,8 @@ async function translateSelected() {
   isTranslating = true;
   updateTextActions();
   els['translation-status'].textContent = 'Translating captions…';
+  showProgress(`Translating captions to ${LANGUAGE_NAMES[targetLanguage] ?? targetLanguage}`, 'The video keeps its captions in the current language until the translation is ready.');
+  showElapsed('Translating');
   try {
     const response = await fetch('/api/translate', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -270,7 +273,11 @@ async function translateSelected() {
     els['translation-status'].textContent = `Translation ready. ${failed ? `${failed} lines fell back to the original. ` : ''}AI wording needs review.`;
   } catch (error) {
     els['translation-status'].textContent = `Could not translate: ${error.message}`;
-  } finally { isTranslating = false; updateTextActions(); }
+  } finally {
+    isTranslating = false;
+    updateTextActions();
+    if (selectedVideoVersion === videoSelectionVersion) hideProgress();
+  }
 }
 
 function sync() {
