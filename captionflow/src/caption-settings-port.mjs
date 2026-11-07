@@ -17,10 +17,10 @@ function assertPanel(panel) {
 }
 
 /** Player-side factory. DOM, network and storage are injected so tests can fake them.
- * deps: { captionWrap, mount, fetch, storage, placeholder, onOpen(), onClose(reason) }
- * onClose reason is 'apply' or 'cancel'.
+ * deps: { captionWrap, mount, fetch, storage, placeholder, onOpen(), onClose(reason), onSaved(result) }
+ * onClose reason is 'apply' or 'cancel'; onSaved gets { fontScaleSaved, error } after an Apply.
  */
-export function createCaptionSettingsPort({ captionWrap, mount, fetch: fetchImpl, storage, placeholder, onOpen, onClose }) {
+export function createCaptionSettingsPort({ captionWrap, mount, fetch: fetchImpl, storage, placeholder, onOpen, onClose, onSaved }) {
   let style = { ...DEFAULT_CAPTION_STYLE };
   let savedFontScale = style.fontScale;
   let styleAtOpen = null;
@@ -81,7 +81,9 @@ export function createCaptionSettingsPort({ captionWrap, mount, fetch: fetchImpl
     async applyAndClose() {
       if (!activePanel) return { fontScaleSaved: false, error: null };
       close('apply');
-      return save();
+      const result = await save();
+      onSaved?.(result);
+      return result;
     },
 
     /** X or Esc: put back the style from when the panel opened. Nothing is saved. */

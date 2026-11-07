@@ -106,6 +106,23 @@ test('applyAndClose saves fontScale through the endpoint only when it changed, o
   assert.equal(JSON.parse(storage.data.get(STORAGE_KEY)).color, '#00ff00');
 });
 
+test('applyAndClose reports a failed save to the player', async () => {
+  const captionWrap = fakeElement();
+  const saved = [];
+  const port = createCaptionSettingsPort({
+    captionWrap, mount: fakeElement(), storage: fakeStorage(), placeholder: { open() {}, close() {} },
+    fetch: async () => ({ ok: false, status: 500, json: async () => ({ error: 'disk full' }) }),
+    onSaved: result => saved.push(result),
+  });
+  port.loadSavedStyle({ fontScale: 1 });
+  port.openPanel();
+  port.setCaptionStyle({ fontScale: 2 });
+  const result = await port.applyAndClose();
+  assert.equal(result.fontScaleSaved, false);
+  assert.match(result.error.message, /disk full/);
+  assert.deepEqual(saved, [result]);
+});
+
 test('applyAndClose uses the font scale the server confirms', async () => {
   const { port, captionWrap } = setup({ serverFontScale: 2 });
   port.openPanel();
