@@ -239,7 +239,7 @@ function applyScale(value) {
   els.size.value = String(value);
 }
 function applyPace() {
-  els.video.playbackRate = els.pace.value === 'slow' ? 0.75 : 1;
+  els.video.playbackRate = els.pace.value === 'manual' ? 1 : Number(els.pace.value);
   lastManualPausedId = null;
   sync();
 }
