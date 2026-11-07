@@ -11,7 +11,7 @@ test('all new text-AI control IDs exist and the player bar remains intact', asyn
     'video-shell', 'pace-button', 'pace-menu', 'caption-settings-root', 'cc']) {
     assert.match(html, new RegExp(`id="${id}"`), `HTML missing #${id}`);
   }
-  assert.match(app, /sentenceReplayRange\(payload\?\.transcript\?\.segments/);
+  assert.match(app, /replayCue\(cues, els\.video\.currentTime\)/);
   assert.match(app, /connectCaptionSettingsPort/);
   assert.match(app, /\/api\/translate/);
   assert.match(app, /\/api\/summarize/);

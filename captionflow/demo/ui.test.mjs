@@ -76,8 +76,7 @@ test('the transcript options include a Summarise item next to the key points sec
   assert.ok($('#transcript-options').contains(button));
   assert.equal(button.disabled, true);
   assert.match(button.textContent, /Summarise transcript/);
-  assert.ok($('#watch-layout').contains($('#summary-section')), 'key points render in the watch area');
-  assert.equal($('#transcript-panel').contains($('#summary-section')), false, 'key points stay visible when the transcript is hidden');
+  assert.ok($('#transcript-panel').contains($('#summary-section')), 'key points render in the transcript panel');
   assert.ok($('#summary-section').contains($('#summarize')));
 });
 

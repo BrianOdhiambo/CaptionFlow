@@ -868,7 +868,7 @@ button:disabled {
     }
 
     .watch-layout:not(.transcript-hidden) .transcript-panel {
-        contain: size
+        overflow-y: auto
     }
 
     .watch-layout:not(.transcript-hidden) .transcript {
