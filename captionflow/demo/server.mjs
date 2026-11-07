@@ -27,6 +27,8 @@ const staticFiles = {
   '/style.css': ['style.css', 'text/css; charset=utf-8'],
   '/player-sync.mjs': ['../src/player-sync.mjs', 'text/javascript; charset=utf-8'],
   '/caption-view.mjs': ['../src/caption-view.mjs', 'text/javascript; charset=utf-8'],
+  '/player-controls.mjs': ['../src/player-controls.mjs', 'text/javascript; charset=utf-8'],
+  '/caption-settings-port.mjs': ['../src/caption-settings-port.mjs', 'text/javascript; charset=utf-8'],
 };
 const supportedMedia = new Set(['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-m4v']);
 
