@@ -6,7 +6,6 @@ import { join } from 'node:path';
 import { once } from 'node:events';
 import { JSDOM } from 'jsdom';
 import { createCaptionFlowDemoServer } from './server.mjs';
-import { SPEED_PRESETS, MIN_SPEED, MAX_SPEED, SPEED_STEP } from '../src/player-controls.mjs';
 
 const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
 const { document } = new JSDOM(html).window;
@@ -58,24 +57,9 @@ test('the CC and pace buttons expose their popups', () => {
   assert.equal($('#cc').getAttribute('aria-controls'), 'caption-settings-root');
   assert.equal($('#pace-button').getAttribute('aria-expanded'), 'false');
   assert.equal($('#pace-button').getAttribute('aria-controls'), 'pace-menu');
-  assert.equal($('#pace-button').hasAttribute('aria-haspopup'), false, 'the pace panel is a disclosure, not a menu');
-});
-
-test('the pace panel offers speed presets, a custom slider and a separate pause toggle', () => {
-  const panel = $('#pace-menu');
-  assert.equal(panel.parentElement, $('#video-shell'));
-  assert.equal(panel.hidden, true);
-  const presets = [...panel.querySelectorAll('input[type=radio][name=speed]')].map(radio => Number(radio.value));
-  assert.deepEqual(presets, [...SPEED_PRESETS]);
-  assert.equal(panel.querySelector('input[name=speed]:checked').value, '1');
-  const slider = $('#speed-slider');
-  assert.equal(slider.type, 'range');
-  assert.deepEqual([Number(slider.min), Number(slider.max), Number(slider.step)], [MIN_SPEED, MAX_SPEED, SPEED_STEP]);
-  assert.ok(document.querySelector('label[for=speed-slider]'));
-  assert.equal(accessibleName($('#speed-down')), 'Slower');
-  assert.equal(accessibleName($('#speed-up')), 'Faster');
-  assert.equal($('#pause-each-caption').type, 'checkbox');
-  assert.equal($('#pause-each-caption').checked, false);
+  assert.equal($('#pace-button').getAttribute('aria-haspopup'), 'menu');
+  const options = [...document.querySelectorAll('#pace-menu [role=menuitemradio]')].map(item => item.dataset.pace);
+  assert.deepEqual(options, ['normal', 'slow', '0.5', '0.25', 'manual']);
 });
 
 test('the transcript toggle sits in the bar and controls the transcript panel', () => {
@@ -87,11 +71,14 @@ test('the transcript toggle sits in the bar and controls the transcript panel', 
   assert.ok($('#transcript-panel').classList.contains('transcript-panel'));
 });
 
-test('the transcript options include a Summarise button, disabled until captions load', () => {
+test('the transcript options include a Summarise item next to the key points section', () => {
   const button = $('#summarise-transcript');
   assert.ok($('#transcript-options').contains(button));
   assert.equal(button.disabled, true);
   assert.match(button.textContent, /Summarise transcript/);
+  assert.ok($('#watch-layout').contains($('#summary-section')), 'key points render in the watch area');
+  assert.equal($('#transcript-panel').contains($('#summary-section')), false, 'key points stay visible when the transcript is hidden');
+  assert.ok($('#summary-section').contains($('#summarize')));
 });
 
 test('the transcript options live in a hidden disclosure in the panel header', () => {

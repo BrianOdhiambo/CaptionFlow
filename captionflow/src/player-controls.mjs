@@ -52,41 +52,6 @@ export function captionStyleToCss(style) {
   };
 }
 
-// Playback speed: YouTube's preset list, plus a custom value in 0.05 steps.
-export const SPEED_PRESETS = Object.freeze([0.25, 0.5, 0.75, 0.9, 1, 1.25, 1.5, 1.75, 2]);
-export const MIN_SPEED = 0.25;
-export const MAX_SPEED = 2;
-export const SPEED_STEP = 0.05;
-
-/** Any input to a supported speed: rounded to the step, clamped, 1 when not a number. */
-export function clampSpeed(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return 1;
-  const stepped = Math.round(n / SPEED_STEP) * SPEED_STEP;
-  return Number(clamp(stepped, MIN_SPEED, MAX_SPEED).toFixed(2));
-}
-
-/** One step faster (direction 1) or slower (-1), within the bounds. */
-export function stepSpeed(speed, direction) {
-  return clampSpeed(clampSpeed(speed) + Math.sign(direction) * SPEED_STEP);
-}
-
-/** "Normal" at 1×, otherwise e.g. "0.75×". */
-export function speedLabel(speed) {
-  const s = clampSpeed(speed);
-  return s === 1 ? 'Normal' : `${s}×`;
-}
-
-/** Button text and accessible name for the pace button. */
-export function paceSummary({ speed = 1, pauseEachCaption = false } = {}) {
-  const s = clampSpeed(speed);
-  const label = speedLabel(s);
-  return {
-    text: `Pace: ${label}${pauseEachCaption ? ' · Pause' : ''}`,
-    ariaLabel: `Reading pace: ${s === 1 ? 'normal speed' : `${s} times speed`}${pauseEachCaption ? ', pausing at each caption' : ''}`,
-  };
-}
-
 /** True only when playing, nothing is open, focus is outside the bar, and the viewer is idle. */
 export function shouldHideControls({ paused, menuOpen, panelOpen, focusInside, msSinceActivity }) {
   return !paused && !menuOpen && !panelOpen && !focusInside && msSinceActivity >= HIDE_CONTROLS_AFTER_MS;
@@ -95,7 +60,6 @@ export function shouldHideControls({ paused, menuOpen, panelOpen, focusInside, m
 const KEY_ACTIONS = {
   ' ': 'togglePlay', k: 'togglePlay', r: 'replay', n: 'next', c: 'openCaptions',
   f: 'fullscreen', m: 'mute', arrowleft: 'seekBack', arrowright: 'seekForward',
-  '>': 'speedUp', '<': 'speedDown',
 };
 const TEXT_INPUT_TYPES = new Set(['text', 'search', 'email', 'url', 'tel', 'password', 'number', 'date', 'time', 'datetime-local', 'month', 'week']);
 

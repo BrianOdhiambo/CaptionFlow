@@ -100,7 +100,7 @@ export function validateProcessedCaptions(input, transcript) {
     if (cue.originalText !== original.text) throw new ContractError(`${path}.originalText`, 'must preserve source text');
     if (!nonEmpty(cue.displayText)) throw new ContractError(`${path}.displayText`, 'cannot be empty');
     const language = normalizeLanguage(cue.language, `${path}.language`, { allowUndetermined: true });
-    if (!['original', 'plain'].includes(cue.mode)) throw new ContractError(`${path}.mode`, 'must be original or plain');
+    if (!['original', 'plain', 'translated'].includes(cue.mode)) throw new ContractError(`${path}.mode`, 'must be original, plain or translated');
     if (!statuses.has(cue.status)) throw new ContractError(`${path}.status`, 'must be ready, needs-review, or fallback');
     if (cue.mode === 'original' && cue.status === 'ready' &&
         (cue.displayText !== original.text || language !== original.language)) {
