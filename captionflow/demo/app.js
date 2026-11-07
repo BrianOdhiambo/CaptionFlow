@@ -1,12 +1,13 @@
-import { selectActiveCue, nextCue, replayCue } from '/player-sync.mjs';
+import { selectActiveCue, nextCue, sentenceReplayRange } from '/player-sync.mjs';
 import { viewCaptionsForMode } from '/caption-view.mjs';
 import { HIDE_CONTROLS_AFTER_MS, shouldHideControls, shortcutFor, cueLabel } from '/player-controls.mjs';
 import { connectCaptionSettingsPort } from '/caption-settings-port.mjs';
+import '/caption-settings-panel.mjs';
 
 const byId = id => document.getElementById(id);
 const ids = ['video','video-file','caption-file','caption','caption-wrap','language','mode','replay','next','transcript','message','time-status','provider','generate','provider-note','hosted-consent-wrap','hosted-consent','download-json','download-transcript','demo-warning','caption-status',
   'video-shell','player-bar','player-hint','play','time','seek','pace-button','pace-text','pace-menu','cc','mute','fullscreen','caption-settings-root',
-  'follow','show-times','transcript-size','transcript-search','search-prev','search-next','search-status'];
+  'follow','show-times','transcript-size','transcript-search','search-prev','search-next','search-status','target-language','translate','translation-status','text-ai-consent','summarize','summary-status','summary-points'];
 const els = Object.fromEntries(ids.map(id => [id, byId(id)]));
 let cues = [];
 let payload = null;
@@ -14,6 +15,10 @@ let source = 'fixture';  // fixture | generated | external
 let currentCueId = null;
 let lastManualPausedId = null;
 let skipManualPauseForCueId = null;
+let sentenceReplayUntil = null;
+let isTranslating = false;
+let isSummarizing = false;
+let textAIAvailable = false;
 let videoSelectionVersion = 0;
 let isGenerating = false;
 let objectUrl = null;
@@ -171,6 +176,7 @@ function transcriptText() {
 
 function sync() {
   const cue = selectActiveCue(cues, els.video.currentTime || 0);
+  if (sentenceReplayUntil && (els.video.currentTime >= sentenceReplayUntil.end - 0.05 || els.video.currentTime < sentenceReplayUntil.start - 0.2)) sentenceReplayUntil = null;
   els.caption.textContent = cue?.displayText ?? (cues.length ? ' ' :
     (els['video-file'].files?.length ? 'Captions not loaded yet' : 'Choose a video to begin.'));
   if (skipManualPauseForCueId && cue?.id !== skipManualPauseForCueId) {
@@ -190,7 +196,7 @@ function sync() {
   els['time-status'].textContent = `Playback position: ${timeLabel(els.video.currentTime || 0)}${label ? ` · ${label}` : ''}`;
   updateTime();
   if (cue && pace === 'manual' && !els.video.paused &&
-      cue.id !== lastManualPausedId && cue.id !== skipManualPauseForCueId &&
+      cue.id !== lastManualPausedId && cue.id !== skipManualPauseForCueId && !sentenceReplayUntil &&
       els.video.currentTime >= cue.start + 0.06) {
     lastManualPausedId = cue.id;
     els.video.pause();
@@ -206,6 +212,7 @@ function setCaptions(data, nextSource) {
   currentCueId = null;
   lastManualPausedId = null;
   skipManualPauseForCueId = null;
+  sentenceReplayUntil = null;
   renderTranscript();
   sync();
   els['download-json'].disabled = false;
@@ -213,10 +220,42 @@ function setCaptions(data, nextSource) {
   els.replay.disabled = false;
   els.next.disabled = false;
   els['demo-warning'].hidden = nextSource !== 'fixture';
+  updateTextActions();
+  showCachedSummary();
+}
+function displayLanguage() {
+  return els['target-language'].value || payload?.sourceLanguage || 'en';
+}
+function updateTextActions() {
+  const ready = Boolean(payload?.transcript?.segments?.length) && source !== 'fixture';
+  els.translate.disabled = !ready || !textAIAvailable || isTranslating;
+  els.summarize.disabled = !ready || !textAIAvailable || isSummarizing;
+
+}
+function showCachedSummary() {
+  els['summary-points'].replaceChildren();
+  const summary = payload?.summaries?.[displayLanguage()];
+  if (!summary) {
+    els['summary-status'].textContent = 'AI key points will appear here after you request them. Verify them against the original transcript.';
+    return;
+  }
+  for (const point of summary.points) {
+    const li = document.createElement('li');
+    li.textContent = point;
+    els['summary-points'].append(li);
+  }
+  els['summary-status'].textContent = `AI-generated key points (${summary.language === 'sw' ? 'Swahili' : 'English'}). Check them against the transcript; they have not been independently verified.`;
+}
+function clearTextOutputs() {
+  els['target-language'].value = '';
+  els['summary-points'].replaceChildren();
+  els['summary-status'].textContent = 'AI key points will appear here after you request them.';
+  els['translation-status'].textContent = 'Select English or Kiswahili after loading timed captions.';
+  updateTextActions();
 }
 function applyGeneratedMode() {
   if (!['generated', 'external'].includes(source) || !payload?.transcript?.segments) return;
-  const desiredLanguage = els.language.value;
+  const desiredLanguage = displayLanguage();
   const desiredMode = els.mode.value;
   const changed = {
     ...payload,
@@ -224,7 +263,9 @@ function applyGeneratedMode() {
   };
   setCaptions(changed, source);
   if (changed.captions.some(c => c.language !== desiredLanguage)) {
-    message(`Translation to ${desiredLanguage} is not available. Showing original speech captions, correctly labeled in their source language.`);
+    message(`Translation to ${desiredLanguage} is not loaded. Click Translate captions with AI; showing original speech text for now.`);
+  } else if (desiredLanguage !== payload.sourceLanguage) {
+    message(`Showing AI-translated ${desiredLanguage === 'sw' ? 'Kiswahili' : 'English'} captions. Check the unreviewed wording against the original.`);
   } else if (desiredMode === 'plain') {
     const reviewed = changed.captions.filter(c => c.status === 'needs-review').length;
     message(reviewed
@@ -244,8 +285,9 @@ async function loadDemoCues() {
   message(`${cues.length} fictional sample captions loaded; they are NOT related to an arbitrary selected video.`);
 }
 function applyPace() {
-  els.video.playbackRate = pace === 'slow' ? 0.75 : 1;
+  els.video.playbackRate = pace === 'slow' ? 0.75 : (['0.5','0.25'].includes(pace) ? Number(pace) : 1);
   lastManualPausedId = null;
+  sentenceReplayUntil = null;
   sync();
 }
 function updateProviderUI() {
@@ -268,7 +310,8 @@ els['video-file'].addEventListener('change', () => {
     objectUrl = null;
     els.video.removeAttribute('src');
     els.video.load();
-    cues = []; payload = null; currentCueId = null;
+    cues = []; payload = null; currentCueId = null; sentenceReplayUntil = null;
+    clearTextOutputs();
     els.transcript.replaceChildren();
     els.caption.textContent = 'Choose a video to begin.';
     els.replay.disabled = true; els.next.disabled = true; els['download-json'].disabled = true; els['download-transcript'].disabled = true;
@@ -281,13 +324,14 @@ els['video-file'].addEventListener('change', () => {
   els.video.load();
   // Never show unrelated fixture captions against a new video automatically.
   cues = []; payload = null; source = 'external'; currentCueId = null;
-  skipManualPauseForCueId = null; lastManualPausedId = null;
+  skipManualPauseForCueId = null; lastManualPausedId = null; sentenceReplayUntil = null;
   els.transcript.replaceChildren();
   els.caption.textContent = 'No captions yet';
   els.replay.disabled = true; els.next.disabled = true;
   els['download-json'].disabled = true;
   els['download-transcript'].disabled = true;
   els['demo-warning'].hidden = true;
+  clearTextOutputs();
   message('Video opened. Select Local and generate matching timed captions, or load a transcript JSON for this exact clip.');
 });
 
@@ -297,6 +341,7 @@ els['caption-file'].addEventListener('change', async () => {
   try {
     const data = JSON.parse(await file.text());
     const parsed = Array.isArray(data.captions) ? data : captionsFromTranscript(data);
+    els['target-language'].value = '';
     setCaptions(parsed, 'external');
     message(`Loaded ${cues.length} caption segments from JSON. Verify they match the selected video and its timestamps.`);
   } catch (error) { message(`Unable to load caption JSON: ${error.message}`); }
@@ -330,6 +375,7 @@ els.generate.addEventListener('click', async () => {
       message('The video changed while transcription was running. The old result was discarded; generate captions for the new video.');
       return;
     }
+    els['target-language'].value = '';
     setCaptions(data, 'generated');
     if (['en', 'sw'].includes(data.sourceLanguage)) els.language.value = data.sourceLanguage;
     applyGeneratedMode();
@@ -344,10 +390,17 @@ els.provider.addEventListener('change', () => {
   if (els.provider.value !== 'fixture') els.mode.value = 'original';
   updateProviderUI();
 });
-for (const name of ['language', 'mode']) els[name].addEventListener('change', () => {
-  if (['generated', 'external'].includes(source) && payload?.transcript?.segments) { applyGeneratedMode(); return; }
+els.language.addEventListener('change', () => {
   if (source === 'fixture') loadDemoCues().catch(error => message(error.message));
-  else message('Using selected caption JSON. Change the JSON or re-transcribe to change caption language or wording.');
+  else message('Spoken-language selection applies when generating captions. Use Caption display language to translate existing captions.');
+});
+els.mode.addEventListener('change', () => {
+  if (['generated', 'external'].includes(source) && payload?.transcript?.segments) applyGeneratedMode();
+  else if (source === 'fixture') loadDemoCues().catch(error => message(error.message));
+});
+els['target-language'].addEventListener('change', () => {
+  if (['generated', 'external'].includes(source) && payload?.transcript?.segments) applyGeneratedMode();
+  showCachedSummary();
 });
 els['transcript-size'].addEventListener('change', () => { els.transcript.dataset.size = els['transcript-size'].value; });
 els['show-times'].addEventListener('change', () => els.transcript.classList.toggle('hide-times', !els['show-times'].checked));
@@ -365,23 +418,28 @@ els['download-transcript'].addEventListener('click', () => {
   const url = URL.createObjectURL(new Blob([transcriptText()], { type: 'text/plain' }));
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = `${payload?.videoId || 'captionflow'}-transcript.txt`;
+  anchor.download = `${payload?.videoId || 'captionflow'}-${displayLanguage()}-transcript.txt`;
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 function replay() {
-  const cue = replayCue(cues, els.video.currentTime);
-  if (!cue) { message('There is no previous caption to replay at this position.'); return; }
-  // Do not immediately auto-pause again at the start of a manually replayed cue.
-  skipManualPauseForCueId = cue.id;
-  els.video.currentTime = cue.start;
+  const range = sentenceReplayRange(payload?.transcript?.segments ?? cues, els.video.currentTime);
+  if (!range) { message('No sentence is available to replay at this position.'); return; }
+  // Keep playback continuous across short cues in manual pace mode.
+  sentenceReplayUntil = { start: range.startCue.start, end: range.endCue.end };
+  skipManualPauseForCueId = range.startCue.id;
+  lastManualPausedId = null;
+  els.video.currentTime = range.startCue.start;
   sync();
   els.video.play().then(
-    () => message(`Replaying ${cueLabel(cues, cue).toLowerCase()}.`),
-    error => message(`Unable to resume playback: ${error.message}`),
+    () => message(range.usedSentenceBoundary
+      ? `Replaying sentence from ${timeLabel(range.startCue.start)}.`
+      : `Replaying nearby context from ${timeLabel(range.startCue.start)} (no clear full stop found).`),
+    error => { sentenceReplayUntil = null; message(`Unable to resume playback: ${error.message}`); },
   );
 }
 function next() {
+  sentenceReplayUntil = null;
   const cue = nextCue(cues, els.video.currentTime);
   if (cue) {
     els.video.currentTime = cue.start;
@@ -401,10 +459,82 @@ els['download-json'].addEventListener('click', () => {
   // Allow the click to consume its object URL; release after the next task.
   queueMicrotask(() => URL.revokeObjectURL(url));
 });
+els.translate.addEventListener('click', async () => {
+  if (!payload?.transcript?.segments || !textAIAvailable || isTranslating) return;
+  const targetLanguage = els['target-language'].value;
+  if (!['en', 'sw'].includes(targetLanguage)) {
+    els['translation-status'].textContent = 'Select English or Kiswahili under Caption display language.';
+    return;
+  }
+  if (targetLanguage === payload.sourceLanguage) {
+    applyGeneratedMode();
+    els['translation-status'].textContent = 'Already in the original spoken language. No AI request needed.';
+    return;
+  }
+  if (payload?.captionVariants?.translations?.[targetLanguage]) {
+    applyGeneratedMode();
+    els['translation-status'].textContent = 'Using previously generated translation; no additional tokens used.';
+    return;
+  }
+  if (!els['text-ai-consent'].checked) {
+    els['translation-status'].textContent = 'Please consent to sending the transcript text to hosted AI.';
+    return;
+  }
+  const selectedVideoVersion = videoSelectionVersion;
+  const transcript = payload.transcript;
+  isTranslating = true; updateTextActions();
+  els['translation-status'].textContent = 'Translating captions with Gemini…';
+  try {
+    const response = await fetch('/api/translate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript, targetLanguage, consent: true }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `Translation HTTP ${response.status}`);
+    if (selectedVideoVersion !== videoSelectionVersion || payload?.transcript !== transcript) return;
+    if (data.videoId !== transcript.videoId || data.targetLanguage !== targetLanguage) throw new Error('Translation response does not match the selected video');
+    payload = { ...payload, captionVariants: { ...payload.captionVariants,
+      translations: { ...payload.captionVariants?.translations, [targetLanguage]: data.captions } } };
+    applyGeneratedMode();
+    const failed = data.captions.filter(c => c.status === 'fallback').length;
+    els['translation-status'].textContent = `Translation ready: ${data.captions.length - failed} captions generated, ${failed} fell back to the original. AI wording requires review.`;
+  } catch (error) {
+    els['translation-status'].textContent = `Could not translate: ${error.message}`;
+  } finally { isTranslating = false; updateTextActions(); }
+});
+els.summarize.addEventListener('click', async () => {
+  if (!payload?.transcript?.segments || !textAIAvailable || isSummarizing) return;
+  const language = displayLanguage();
+  if (!['en', 'sw'].includes(language)) return;
+  if (payload.summaries?.[language]) { showCachedSummary(); return; }
+  if (!els['text-ai-consent'].checked) {
+    els['summary-status'].textContent = 'Consent to sending transcript text to the AI service first.';
+    els['text-ai-consent'].focus();
+    return;
+  }
+  const selectedVideoVersion = videoSelectionVersion;
+  const transcript = payload.transcript;
+  isSummarizing = true; updateTextActions();
+  els['summary-status'].textContent = 'Generating key points from the full transcript…';
+  try {
+    const response = await fetch('/api/summarize', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript, language, consent: true }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `Summary HTTP ${response.status}`);
+    if (selectedVideoVersion !== videoSelectionVersion || payload?.transcript !== transcript) return;
+    if (data.videoId !== transcript.videoId || data.language !== language || !Array.isArray(data.points)) throw new Error('Summary response does not match the transcript');
+    payload = { ...payload, summaries: { ...payload.summaries, [language]: data } };
+    showCachedSummary();
+  } catch (error) {
+    els['summary-status'].textContent = `Could not summarize: ${error.message}`;
+  } finally { isSummarizing = false; updateTextActions(); }
+});
 // In-player control bar. Everything lives inside #video-shell so full screen keeps it all.
 const shell = els['video-shell'];
-const PACE_LABELS = { normal: 'Normal', slow: 'Slow', manual: 'Pause at each caption' };
-const PACE_SHORT = { normal: 'Normal', slow: 'Slow', manual: 'Pause' };
+const PACE_LABELS = { normal: 'Normal', slow: 'Slow (0.75×)', '0.5': '0.5×', '0.25': '0.25×', manual: 'Pause at each caption' };
+const PACE_SHORT = { normal: 'Normal', slow: '0.75×', '0.5': '0.5×', '0.25': '0.25×', manual: 'Pause' };
 const SEEK_STEP_SECONDS = 5;
 let lastActivity = Date.now();
 let hideTimer = null;
@@ -649,6 +779,8 @@ try {
   const prefs = await prefsResponse.json();
   if (!providersResponse.ok || !prefsResponse.ok) throw new Error(providers.error || prefs.error || 'Setup failed');
   providerAvailability = providers.providers;
+  textAIAvailable = Boolean(providers.textAI);
+  updateTextActions();
   for (const option of els.provider.options) option.disabled = !providerAvailability[option.value];
   els.provider.value = providerAvailability[providers.defaultProvider] ? providers.defaultProvider : 'fixture';
   captionSettings.loadSavedStyle({ fontScale: prefs.fontScale });
