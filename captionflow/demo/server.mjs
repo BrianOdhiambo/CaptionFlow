@@ -16,7 +16,8 @@ import { createFixtureTranscriber } from '../src/mocks/fixture-transcriber.mjs';
 import { createFixtureCaptionProcessor } from '../src/mocks/fixture-caption-processor.mjs';
 import { createPlainCaptionProcessor } from '../src/providers/plain-captions.mjs';
 import { createLocalWhisperTranscriber } from '../src/providers/local-whisper.mjs';
-import { createConfiguredHostedTranscriber, resolveHostedApiKey } from '../src/providers/hosted-asr.mjs';
+import { createConfiguredHostedTranscriber, resolveHostedApiKey, isGeminiGatewayUrl } from '../src/providers/hosted-asr.mjs';
+import { createGeminiTextService } from '../src/providers/gemini-text.mjs';
 import { createToolkitPreferenceProvider } from '../src/toolkit-preferences.mjs';
 import { loadCaptionFlowEnv } from '../src/runtime-config.mjs';
 
@@ -29,6 +30,7 @@ const staticFiles = {
   '/caption-view.mjs': ['../src/caption-view.mjs', 'text/javascript; charset=utf-8'],
   '/player-controls.mjs': ['../src/player-controls.mjs', 'text/javascript; charset=utf-8'],
   '/caption-settings-port.mjs': ['../src/caption-settings-port.mjs', 'text/javascript; charset=utf-8'],
+  '/caption-settings-panel.mjs': ['caption-settings-panel.mjs', 'text/javascript; charset=utf-8'],
 };
 const supportedMedia = new Set(['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-m4v']);
 
@@ -39,11 +41,16 @@ const send = (res, status, obj) => {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
   res.end(JSON.stringify(obj));
 };
-async function parseJson(req) {
+async function parseJson(req, maxBytes = 4096) {
+  if (!req.headers['content-type']?.toLowerCase().startsWith('application/json')) {
+    throw new HttpError(415, 'Expected application/json');
+  }
   let input = '';
+  let size = 0;
   for await (const chunk of req) {
+    size += chunk.length;
+    if (size > maxBytes) throw new HttpError(413, 'Request body too large');
     input += chunk.toString('utf8');
-    if (input.length > 4096) throw new HttpError(413, 'Request body too large');
   }
   try { return JSON.parse(input); }
   catch { throw new HttpError(400, 'Expected JSON body'); }
@@ -93,6 +100,7 @@ export async function createCaptionFlowDemoServer({
   hostedToken = resolveHostedApiKey(),
   hostedProtocol = process.env.CAPTIONFLOW_HOSTED_PROTOCOL,
   hostedModel = process.env.CAPTIONFLOW_HOSTED_MODEL ?? 'gemini-3.8-flash',
+  textService, // injectable Gemini text service for tests
 } = {}) {
   const kv = fileKV(storageDir);
   const { librarian } = createToolkit({ kv });
@@ -104,6 +112,8 @@ export async function createCaptionFlowDemoServer({
   const plainProcessor = createPlainCaptionProcessor();
   const localTranscriber = providers.local || createLocalWhisperTranscriber();
   const hostedTranscriber = providers.hosted || (hostedUrl ? createConfiguredHostedTranscriber({ endpoint: hostedUrl, token: hostedToken, protocol: hostedProtocol, model: hostedModel }) : null);
+  const captionTextService = textService || providers.text || (hostedUrl && hostedToken && (hostedProtocol === 'gemini' || (!hostedProtocol && isGeminiGatewayUrl(hostedUrl)))
+    ? createGeminiTextService({ endpoint: hostedUrl, token: hostedToken, model: hostedModel }) : null);
   let busy = false;
 
   return createHttpServer(async (req, res) => {
@@ -118,7 +128,7 @@ export async function createCaptionFlowDemoServer({
       if (req.method === 'GET' && url.pathname === '/api/providers') {
         send(res, 200, { providers: { fixture: true, local: true, hosted: Boolean(hostedTranscriber) },
           defaultProvider: ['fixture', 'local', 'hosted'].includes(process.env.CAPTIONFLOW_AI_BACKEND) ? process.env.CAPTIONFLOW_AI_BACKEND : 'fixture',
-          maxMediaBytes });
+          maxMediaBytes, textAI: Boolean(captionTextService) });
         return;
       }
       if (req.method === 'GET' && url.pathname === '/api/captions') {
@@ -173,6 +183,23 @@ export async function createCaptionFlowDemoServer({
           busy = false;
         }
         send(res, 200, { ...result, provider });
+        return;
+      }
+      if (req.method === 'POST' && (url.pathname === '/api/translate' || url.pathname === '/api/summarize')) {
+        if (!captionTextService) throw new HttpError(503, 'Gemini text AI is not configured');
+        if (busy) throw new HttpError(409, 'Another AI operation is in progress');
+        const body = await parseJson(req, 150 * 1024);
+        if (body?.consent !== true) throw new HttpError(400, 'Consent is required before sending transcript text to Gemini');
+        busy = true;
+        try {
+          if (url.pathname === '/api/translate') {
+            const output = await captionTextService.translate({ transcript: body.transcript, targetLanguage: body.targetLanguage });
+            send(res, 200, output);
+          } else {
+            const output = await captionTextService.summarize({ transcript: body.transcript, language: body.language });
+            send(res, 200, output);
+          }
+        } finally { busy = false; }
         return;
       }
       if (req.method === 'GET' && url.pathname === '/api/preferences') {

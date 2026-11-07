@@ -58,7 +58,7 @@ test('the CC and pace buttons expose their popups', () => {
   assert.equal($('#pace-button').getAttribute('aria-expanded'), 'false');
   assert.equal($('#pace-button').getAttribute('aria-haspopup'), 'menu');
   const options = [...document.querySelectorAll('#pace-menu [role=menuitemradio]')].map(item => item.dataset.pace);
-  assert.deepEqual(options, ['normal', 'slow', 'manual']);
+  assert.deepEqual(options, ['normal', 'slow', '0.5', '0.25', 'manual']);
 });
 
 test('the old controls under the video and in panel 3 are gone', () => {

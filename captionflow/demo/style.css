@@ -748,3 +748,34 @@ button:disabled {
         max-height: 460px
     }
 }
+/* AI translation and key points integrated into the existing transcript sidebar. */
+.text-ai-options, .transcript-summary {
+  margin: 12px 0;
+  border: 1px solid #b5c6d2;
+  border-radius: 10px;
+  padding: 12px;
+  background: #f7fafc;
+  color: #19314a;
+}
+.text-ai-options summary { font-weight: 700; cursor: pointer; padding: 4px 0; }
+.text-ai-options label:not(.consent) { display: block; margin-top: 12px; font-weight: 650; }
+.text-ai-options select { display: block; width: 100%; max-width: 320px; margin: 6px 0 10px; padding: 9px; }
+.text-ai-options .consent { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0; line-height: 1.4; }
+.text-ai-options .consent input { flex-shrink: 0; margin-top: 4px; }
+.text-ai-options button, .transcript-summary button { max-width: 100%; }
+.transcript-summary h4 { margin: 2px 0 8px; }
+.summary-points { padding-left: 22px; line-height: 1.5; }
+.summary-points li { margin-bottom: 8px; }
+
+/* Caption appearance panel registered with the team's shared settings port. */
+.caption-style-dialog { background: white; color: #13263a; padding: 16px; border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.45); }
+.caption-style-dialog h3 { margin: 0 0 8px; font-size: 1.15rem; }
+.caption-style-dialog p { margin: 0 0 10px; font-size: .88rem; }
+.caption-style-dialog .style-field { display: grid; gap: 5px; margin: 10px 0;
+  font-weight: 650; }
+.caption-style-dialog .style-field input:not([type=color]),
+.caption-style-dialog .style-field select { width: 100%; }
+.caption-style-dialog input[type=color] { min-height: 42px; width: 90px; }
+.caption-style-dialog .style-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
+.caption-style-dialog button { min-height: 44px; }
