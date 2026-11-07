@@ -151,17 +151,30 @@ video {
 .caption-wrap {
     pointer-events: none;
     position: absolute;
-    bottom: 68px;
+    bottom: 16px;
     left: 5%;
     right: 5%;
     text-align: center;
     display: flex;
-    justify-content: center
+    justify-content: center;
+    transition: bottom .2s ease
 }
 
+/* Captions never sit under the bar: they move up while it shows. */
+.video-shell.controls-visible .caption-wrap {
+    bottom: calc(var(--bar-height, 64px) + 12px)
+}
+
+.caption-wrap.captions-hidden {
+    display: none
+}
+
+/* Caption style comes from CSS variables set by the caption settings port. */
 .caption-wrap>div {
     background: rgba(0, 0, 0, .87);
-    color: #fff;
+    background: color-mix(in srgb, var(--caption-bg, #000000) calc(var(--caption-bg-opacity, .87) * 100%), transparent);
+    color: var(--caption-color, #ffffff);
+    font-family: var(--caption-font, inherit);
     font-weight: 650;
     line-height: 1.4;
     font-size: calc(1.25rem * var(--caption-scale, 1));
@@ -171,9 +184,270 @@ video {
     overflow-wrap: anywhere
 }
 
-.caption-wrap.low>div {
-    background: rgba(40, 47, 52, .66);
-    color: #eee
+.caption-wrap.contrast-high>div {
+    background: var(--caption-bg, #000000);
+    outline: 2px solid var(--caption-color, #ffffff);
+    font-weight: 800
+}
+
+.caption-wrap.contrast-inverted>div {
+    background: var(--caption-color, #ffffff);
+    color: var(--caption-bg, #000000)
+}
+
+/* In-player control bar */
+.player-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: auto auto minmax(80px, 1fr) auto;
+    grid-template-areas:
+        "hint hint hint hint"
+        "left time seek right";
+    align-items: center;
+    gap: 4px 10px;
+    padding: 20px 10px 8px;
+    background: linear-gradient(rgba(6, 9, 13, 0), rgba(6, 9, 13, .92) 35%);
+    color: #fff;
+    transition: opacity .2s ease, transform .2s ease
+}
+
+.video-shell:not(.controls-visible) .player-bar {
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none
+}
+
+.video-shell:not(.controls-visible) video {
+    cursor: none
+}
+
+.player-hint {
+    grid-area: hint;
+    justify-self: center;
+    margin: 0 0 4px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: #fff7e6;
+    color: #13263a;
+    font-weight: 700;
+    text-align: center
+}
+
+.player-hint[hidden] {
+    display: none
+}
+
+.bar-group {
+    display: flex;
+    align-items: center;
+    gap: 4px
+}
+
+.bar-left {
+    grid-area: left
+}
+
+.bar-right {
+    grid-area: right;
+    justify-self: end
+}
+
+.bar-time {
+    grid-area: time;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    white-space: nowrap
+}
+
+.bar-seek {
+    grid-area: seek;
+    width: 100%;
+    min-height: 44px;
+    margin: 0;
+    accent-color: #df8f2a;
+    cursor: pointer
+}
+
+.bar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 6px 10px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: #fff;
+    white-space: nowrap
+}
+
+.bar-btn:hover {
+    background: rgba(255, 255, 255, .16)
+}
+
+.bar-btn[hidden] {
+    display: none
+}
+
+.bar-btn[aria-expanded=true] {
+    background: rgba(255, 255, 255, .22)
+}
+
+.icon {
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+    flex: none
+}
+
+.bar-btn[data-state=paused] .icon-pause,
+.bar-btn[data-state=playing] .icon-play,
+.bar-btn[data-state=unmuted] .icon-muted,
+.bar-btn[data-state=muted] .icon-unmuted,
+.bar-btn[data-state=off] .icon-fs-exit,
+.bar-btn[data-state=on] .icon-fs-enter {
+    display: none
+}
+
+.pace-wrap {
+    position: relative
+}
+
+.pace-menu {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 6px);
+    z-index: 4;
+    min-width: 230px;
+    margin: 0;
+    padding: 6px;
+    list-style: none;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, .45)
+}
+
+.pace-menu[hidden] {
+    display: none
+}
+
+.pace-menu button {
+    position: relative;
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px 10px 34px;
+    border: 0;
+    background: transparent;
+    color: #13263a;
+    text-align: left
+}
+
+.pace-menu button:hover {
+    background: #e6f1f8
+}
+
+.pace-menu button[aria-checked=true]::before {
+    content: "✓";
+    position: absolute;
+    left: 12px
+}
+
+/* The caption settings panel renders inside this mount; it stays in full screen. */
+.caption-settings-root {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 3;
+    width: min(360px, calc(100% - 24px));
+    max-height: calc(100% - var(--bar-height, 64px) - 24px);
+    overflow: auto
+}
+
+.caption-settings-root[hidden] {
+    display: none
+}
+
+.caption-settings-root:focus-visible {
+    outline: 3px solid #df8f2a;
+    outline-offset: 2px
+}
+
+.caption-settings-placeholder {
+    padding: 18px;
+    background: white;
+    color: #13263a;
+    border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, .45)
+}
+
+.caption-settings-placeholder p {
+    margin: 0 0 12px;
+    font-weight: 600
+}
+
+.caption-settings-placeholder button {
+    min-height: 44px
+}
+
+.video-shell:fullscreen {
+    border-radius: 0;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 100%
+}
+
+.video-shell:fullscreen video {
+    max-height: none;
+    min-height: 0;
+    height: 100%
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .player-bar,
+    .caption-wrap {
+        transition: none
+    }
+}
+
+/* Phone: seek bar on its own row, icons only (names stay for screen readers). */
+@media (max-width: 599px) {
+    main {
+        padding: 0 12px
+    }
+
+    .player-bar {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "hint hint"
+            "seek time"
+            "left right";
+        gap: 0 8px;
+        padding: 16px 4px 4px
+    }
+
+    .bar-text {
+        display: none
+    }
+
+    .bar-btn {
+        padding: 6px
+    }
+
+    .bar-group {
+        gap: 0
+    }
+
+    .pace-menu {
+        right: -96px
+    }
 }
 
 .actions {
@@ -269,7 +543,6 @@ footer {
     }
 
     .caption-wrap {
-        bottom: 58px;
         left: 3%;
         right: 3%
     }
