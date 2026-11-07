@@ -10,7 +10,7 @@ const ids = ['video', 'video-file', 'video-link', 'load-link', 'link-form', 'emp
   'watch-layout', 'transcript-panel', 'transcript', 'transcript-toggle', 'transcript-options-button', 'transcript-options',
   'follow', 'show-times', 'transcript-size', 'download-transcript', 'transcript-search', 'search-prev', 'search-next', 'search-status',
   'target-language', 'translation-status',
-  'player-bar', 'player-hint', 'play', 'time', 'seek', 'replay', 'next', 'pace-button', 'pace-text', 'pace-menu',
+  'player-bar', 'player-hint', 'play', 'time', 'seek', 'replay', 'next', 'pace-wrap', 'pace-button', 'pace-text', 'pace-menu',
   'speed-slider', 'speed-value', 'speed-down', 'speed-up', 'pause-each-caption', 'cc', 'caption-settings-button', 'language-wrap', 'language-button', 'language-menu', 'mute', 'fullscreen',
   'caption', 'caption-wrap', 'caption-settings-root', 'message', 'progress-overlay', 'progress-title', 'progress-detail'];
 const els = Object.fromEntries(ids.map(id => [id, byId(id)]));

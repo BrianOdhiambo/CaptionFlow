@@ -392,6 +392,7 @@ video {
     padding: 6px;
     list-style: none;
     background: white;
+    color: #13263a;
     border-radius: 10px;
     box-shadow: 0 6px 24px rgba(0, 0, 0, .45)
 }
@@ -427,7 +428,7 @@ video {
  * would run off the player. Overlay it on the bar's bottom-right corner
  * instead (.player-bar is the nearest positioned ancestor). */
 @container player-shell (max-width: 480px) {
-    .pace-wrap {
+    #pace-wrap {
         position: static
     }
 

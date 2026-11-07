@@ -35,28 +35,6 @@
             <div id="caption" aria-live="off"></div>
           </div>
           <div id="caption-settings-root" class="caption-settings-root" hidden></div>
-                <div id="pace-menu" class="pace-menu" role="group" aria-label="Reading pace" hidden>
-                  <fieldset class="speed-presets">
-                    <legend>Speed</legend>
-                    <label><input type="radio" name="speed" value="0.25" /> 0.25×</label>
-                    <label><input type="radio" name="speed" value="0.5" /> 0.5×</label>
-                    <label><input type="radio" name="speed" value="0.75" /> 0.75×</label>
-                    <label><input type="radio" name="speed" value="0.9" /> 0.9×</label>
-                    <label><input type="radio" name="speed" value="1" checked /> Normal</label>
-                    <label><input type="radio" name="speed" value="1.25" /> 1.25×</label>
-                    <label><input type="radio" name="speed" value="1.5" /> 1.5×</label>
-                    <label><input type="radio" name="speed" value="1.75" /> 1.75×</label>
-                    <label><input type="radio" name="speed" value="2" /> 2×</label>
-                  </fieldset>
-                  <div class="speed-custom">
-                    <label for="speed-slider">Custom speed</label>
-                    <output id="speed-value" for="speed-slider">1×</output>
-                    <button id="speed-down" class="speed-step" type="button" aria-label="Slower" title="Slower (Shift + &lt;)">−</button>
-                    <input id="speed-slider" type="range" min="0.25" max="2" step="0.05" value="1" aria-valuetext="Normal speed" />
-                    <button id="speed-up" class="speed-step" type="button" aria-label="Faster" title="Faster (Shift + &gt;)">+</button>
-                  </div>
-                  <label class="pause-toggle"><input type="checkbox" id="pause-each-caption" /> Pause at each caption</label>
-                </div>
                 <div class="player-bar" id="player-bar" role="group" aria-label="Video controls">
                   <p id="player-hint" class="player-hint" hidden>
                     Paused so you can read. Press Play or Next.
@@ -82,9 +60,33 @@
                       <button id="transcript-toggle" class="bar-btn" type="button" aria-pressed="true" aria-controls="transcript-panel" aria-label="Transcript" title="Hide transcript">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 5h2v2H3zm4 0h14v2H7zM3 11h2v2H3zm4 0h14v2H7zM3 17h2v2H3zm4 0h14v2H7z"/></svg>
                       </button>
+                      <div class="menu-wrap" id="pace-wrap">
                       <button id="pace-button" class="bar-btn" type="button" aria-expanded="false" aria-controls="pace-menu" aria-label="Reading pace: normal speed" title="Reading pace (Shift + &lt; or &gt; to change speed)">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4a9 9 0 0 0-7.4 14.1l1.6-1.2A7 7 0 1 1 19 13a7 7 0 0 1-1.2 3.9l1.6 1.2A9 9 0 0 0 12 4zm4.6 4.2-5.7 4.3a1.6 1.6 0 1 0 2.3 2.2z"/></svg><span class="bar-text" id="pace-text">Pace: Normal</span>
                       </button>
+                  <div id="pace-menu" class="pace-menu" role="group" aria-label="Reading pace" hidden>
+                    <fieldset class="speed-presets">
+                      <legend>Speed</legend>
+                      <label><input type="radio" name="speed" value="0.25" /> 0.25×</label>
+                      <label><input type="radio" name="speed" value="0.5" /> 0.5×</label>
+                      <label><input type="radio" name="speed" value="0.75" /> 0.75×</label>
+                      <label><input type="radio" name="speed" value="0.9" /> 0.9×</label>
+                      <label><input type="radio" name="speed" value="1" checked /> Normal</label>
+                      <label><input type="radio" name="speed" value="1.25" /> 1.25×</label>
+                      <label><input type="radio" name="speed" value="1.5" /> 1.5×</label>
+                      <label><input type="radio" name="speed" value="1.75" /> 1.75×</label>
+                      <label><input type="radio" name="speed" value="2" /> 2×</label>
+                    </fieldset>
+                    <div class="speed-custom">
+                      <label for="speed-slider">Custom speed</label>
+                      <output id="speed-value" for="speed-slider">1×</output>
+                      <button id="speed-down" class="speed-step" type="button" aria-label="Slower" title="Slower (Shift + &lt;)">−</button>
+                      <input id="speed-slider" type="range" min="0.25" max="2" step="0.05" value="1" aria-valuetext="Normal speed" />
+                      <button id="speed-up" class="speed-step" type="button" aria-label="Faster" title="Faster (Shift + &gt;)">+</button>
+                    </div>
+                    <label class="pause-toggle"><input type="checkbox" id="pause-each-caption" /> Pause at each caption</label>
+                  </div>
+                      </div>
                                             <div class="menu-wrap" id="language-wrap">
                         <button id="language-button" class="bar-btn bar-btn-text" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="language-menu" aria-label="Caption language" title="Caption language">Original</button>
                         <ul id="language-menu" class="pace-menu language-menu" role="menu" aria-label="Caption language" hidden>
