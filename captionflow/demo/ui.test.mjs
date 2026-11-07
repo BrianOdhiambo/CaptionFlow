@@ -42,6 +42,16 @@ test('every button has an accessible name and every icon is hidden from assistiv
   assert.notEqual(accessibleName($('#seek')), '');
 });
 
+test('bar buttons show only icons and their short text label', () => {
+  for (const button of document.querySelectorAll('#player-bar .bar-btn')) {
+    const clone = button.cloneNode(true);
+    clone.querySelectorAll('.bar-text').forEach(span => span.remove());
+    assert.equal(clone.textContent.trim(), '', `#${button.id} has stray text`);
+    assert.ok(button.querySelector('svg.icon'), `#${button.id} has an icon`);
+  }
+  assert.equal($('#replay').querySelector('.icon-play, .icon-pause'), null);
+});
+
 test('the CC and pace buttons expose their popups', () => {
   assert.equal($('#cc').getAttribute('aria-expanded'), 'false');
   assert.equal($('#cc').getAttribute('aria-controls'), 'caption-settings-root');

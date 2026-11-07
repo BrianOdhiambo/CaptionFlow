@@ -356,7 +356,10 @@ function seekBy(seconds) {
   if (!duration()) return;
   els.video.currentTime = Math.min(duration(), Math.max(0, els.video.currentTime + seconds));
 }
-function toggleMute() { els.video.muted = !els.video.muted; }
+function toggleMute() {
+  els.video.muted = !els.video.muted;
+  updateMuteButton();
+}
 function updateMuteButton() {
   const muted = els.video.muted;
   els.mute.dataset.state = muted ? 'muted' : 'unmuted';
