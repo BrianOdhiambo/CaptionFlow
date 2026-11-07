@@ -236,9 +236,11 @@ video {
  * #video-shell's `overflow: hidden` and become invisible and unclickable.
  * Names stay for screen readers via aria-label. A container query, not a
  * viewport one: the transcript panel's two-column layout keeps #video-shell
- * well under the viewport width on most desktop windows. */
+ * well under the viewport width on most desktop windows. Replay/Next
+ * (.bar-btn-essential) are core accessibility controls, not conveniences:
+ * their text label never collapses, at any width. */
 @container player-shell (max-width: 760px) {
-    .bar-text {
+    .bar-btn:not(.bar-btn-essential) .bar-text {
         display: none
     }
 
@@ -251,9 +253,15 @@ video {
     }
 
     .player-bar {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "hint hint"
+            "seek time"
+            "buttons buttons";
         gap: 4px 6px;
         padding: 16px 6px 6px
     }
+
 }
 
 .player-hint {
@@ -274,6 +282,8 @@ video {
 
 .bar-group {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     align-items: center;
     gap: 4px
 }
@@ -285,6 +295,30 @@ video {
  * there isn't room for both on one line. */
 .bar-buttons {
     display: contents
+}
+
+/* Play/Replay/Next (bar-left) and Pace/CC/Mute/Full screen (bar-right)
+ * share one row below 760px, but Replay/Next's text never collapses (see
+ * above), so the two groups can together need more than that row's width.
+ * flex-wrap lets them spill onto a second row instead of overlapping (the
+ * group painted later, bar-right, would otherwise silently swallow clicks
+ * meant for bar-left, e.g. Next). Wraps only when actually needed, at any
+ * container width. Positioned after the base `.bar-buttons` rule above so
+ * it wins the cascade when its condition matches: two rules of equal
+ * specificity, and a container query's condition matching doesn't add any. */
+@container player-shell (max-width: 760px) {
+    .bar-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 4px 8px;
+        grid-area: buttons
+    }
+
+    .pace-menu {
+        right: -96px
+    }
 }
 
 .bar-left {
@@ -464,49 +498,6 @@ video {
     }
 }
 
-/* Narrow player: seek bar on its own row, icons only. A container query
- * (see #video-shell above) because the transcript panel's layout can make
- * the player this narrow well before the page itself reaches phone width. */
-@container player-shell (max-width: 560px) {
-    .player-bar {
-        grid-template-columns: minmax(0, 1fr) auto;
-        grid-template-areas:
-            "hint hint"
-            "seek time"
-            "left right";
-        gap: 0 8px;
-        padding: 16px 4px 4px
-    }
-
-    .pace-menu {
-        right: -96px
-    }
-}
-
-/* Even on a narrow phone, the left (Play/Replay/Next) and right (Pace/CC/
- * Mute/Full screen) groups can together need more than one row's width at
- * 44px tap targets each. Below that point give them their own row instead
- * of squeezing both into "left right": without this they overlap and the
- * one painted on top (bar-right, later in source order) silently swallows
- * clicks meant for the other (e.g. Next becomes unclickable). flex-wrap
- * finds the right breakpoint itself, for any button set or icon size. */
-@container player-shell (max-width: 340px) {
-    .player-bar {
-        grid-template-areas:
-            "hint hint"
-            "seek time"
-            "buttons buttons"
-    }
-
-    .bar-buttons {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: space-between;
-        align-items: center;
-        gap: 4px 8px;
-        grid-area: buttons
-    }
-}
 
 .actions {
     display: flex;
@@ -611,6 +602,22 @@ footer {
 
     h1 {
         font-size: 1.65rem
+    }
+}
+
+/* Below this width, Play + the two always-full-text buttons (bar-left) and
+ * the four icon buttons (bar-right) no longer fit on one wrapped row each;
+ * .bar-group wrapping spreads them across enough rows that the bar overlay
+ * needs more height than the video area normally gets. Grow the floor so
+ * the overlay still fits inside #video-shell instead of being clipped off
+ * the top by `overflow: hidden`. Positioned after the max-width: 599px
+ * media query above, which sets the same properties: equal specificity, so
+ * source order decides, and this (container query) rule must win when both
+ * match. */
+@container player-shell (max-width: 340px) {
+    .video-shell,
+    video {
+        min-height: 340px
     }
 }
 
